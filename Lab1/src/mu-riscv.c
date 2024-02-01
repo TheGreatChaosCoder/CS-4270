@@ -466,28 +466,43 @@ void handle_instruction()
 
 	uint32_t instruction = mem_read_32(CURRENT_STATE.PC);
 
-	uint8_t opcode_bitmask = 0x7f; //01111111
+	uint8_t opcode_bitmask = 0x7f; //0111 1111  to low quarter word
 	uint8_t opcode = instruction & opcode_bitmask;
 
 	switch(opcode)
 	{
-	case 51:
-		uint32_t rd = (instruction & 0xF80) >> 7;
-		uint32_t f3 = (instruction & 0x7000) >> 12;
-		uint32_t rs1 = (instruction & 0xF80000) >> 15;
-		uint32_t rs2 = (instruction & 0x1F00000) >> 20;
-		uint32_t f7 = (instruction & 0xFE000000) >> 25;
+	case 0x33: //R-type Instruction
+		R_Processing(
+			(instruction & 0xF80) >> 7, //rd
+			(instruction & 0x7000) >> 12, //f3
+			(instruction & 0xF80000) >> 15, //rs1
+			(instruction & 0xF000000) >> 20, //rs2
+			(instruction & 0xF000000) >> 25 //f7
+		);
+		break;
 
-		R_Processing(rd,f3,rs1,rs2,f7);
-		
-		printf("here lmao\n");
+	case 0x03: //I-type Load Instruction
+		Iimm_Processing(
+			(instruction & 0xF80) >> 7, //rd
+			(instruction & 0x7000) >> 12, //f3
+			(instruction & 0xF80000) >> 15, //rs1
+			(instruction & 0xFFE00000) >> 20 //imm
+		);
+		break;
 
+	case 0x23: ;//S-type Store Instruction
+		S_Processing(
+			(instruction & 0xF80) >> 7, // imm[4:0]
+			(instruction & 0x7000) >> 12, //f3
+			(instruction & 0xF80000) >> 15, //rs1
+			(instruction & 0x1F00000) >> 20, //rs2
+			(instruction & 0xFE00000) >> 25 // imm[11:5]
+		);
 		break;
 
 	default:
 		printf("%d\n", opcode );
 		break;
-
 	}
 
 	NEXT_STATE.PC += 4;
