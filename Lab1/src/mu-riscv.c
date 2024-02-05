@@ -476,8 +476,8 @@ void handle_instruction()
 			(instruction & 0xF80) >> 7, //rd
 			(instruction & 0x7000) >> 12, //f3
 			(instruction & 0xF80000) >> 15, //rs1
-			(instruction & 0xF000000) >> 20, //rs2
-			(instruction & 0xF000000) >> 25 //f7
+			(instruction & 0x1F00000) >> 20, //rs2
+			(instruction & 0xFE000000) >> 25 //f7
 		);
 		break;
 
@@ -496,7 +496,7 @@ void handle_instruction()
 			(instruction & 0x7000) >> 12, //f3
 			(instruction & 0xF80000) >> 15, //rs1
 			(instruction & 0x1F00000) >> 20, //rs2
-			(instruction & 0xFE00000) >> 25 // imm[11:5]
+			(instruction & 0xFE000000) >> 25 // imm[11:5]
 		);
 		break;
 
@@ -526,6 +526,86 @@ void initialize() {
 void print_program(){
 	/*IMPLEMENT THIS*/
 	/* execute one instruction at a time. Use/update CURRENT_STATE and and NEXT_STATE, as necessary.*/
+	uint32_t addr;
+    for(addr = CURRENT_STATE.PC; addr < MEM_TEXT_END; addr += 4){
+        uint32_t instruction = mem_read_32(addr);
+
+        uint32_t opcode = instruction & 0x7F;
+        uint32_t rd = (instruction >> 7) & 0x1F;
+        uint32_t funct3 = (instruction >> 12) & 0x7;
+        uint32_t rs1 = (instruction >> 15) & 0x1F;
+        uint32_t rs2 = (instruction >> 20) & 0x1F;
+        uint32_t funct7 = (instruction >> 25) & 0x7F;
+
+        int32_t imm; // immediate value
+
+		if (opcode == 00000000) { // kind of hard coded? not sure what to do here but this is a band-aid for now
+			break;
+		}
+
+        printf("%08x: %08x ", addr, instruction);
+
+        switch (opcode) {
+            case 0x33: // R-type
+                switch (funct3) {
+                    case 0x0:
+                        if (funct7 == 0x00) printf("add ");
+                        else if (funct7 == 0x20) printf("sub ");
+                        break;
+                    case 0x1: printf("sll "); break;
+                    case 0x2: printf("slt "); break;
+                    case 0x3: printf("sltu "); break;
+                    case 0x4: printf("xor "); break;
+                    case 0x5:
+                        if (funct7 == 0x00) printf("srl ");
+                        else if (funct7 == 0x20) printf("sra ");
+                        break;
+                    case 0x6: printf("or "); break;
+                    case 0x7: printf("and "); break;
+                }
+                printf("x%d, x%d, x%d\n", rd, rs1, rs2);
+                break;
+            case 0x03: // I-type (load)
+                imm = (instruction >> 20);
+                switch (funct3) {
+                    case 0x0: printf("lb "); break;
+                    case 0x1: printf("lh "); break;
+                    case 0x2: printf("lw "); break;
+                    case 0x4: printf("lbu "); break;
+                    case 0x5: printf("lhu "); break;
+                }
+                printf("x%d, %d(x%d)\n", rd, imm, rs1);
+                break;
+            case 0x13: // I-type (addi, slti, sltiu, xori, ori, andi, slli, srli, srai)
+                imm = (instruction >> 20);
+                switch (funct3) {
+                    case 0x0: printf("addi "); break;
+                    case 0x2: printf("slti "); break;
+                    case 0x3: printf("sltiu "); break;
+                    case 0x4: printf("xori "); break;
+                    case 0x6: printf("ori "); break;
+                    case 0x7: printf("andi "); break;
+                    case 0x1: printf("slli "); break;
+                    case 0x5:
+                        if (funct7 == 0x00) printf("srli ");
+                        else if (funct7 == 0x20) printf("srai ");
+                        break;
+                }
+                printf("x%d, x%d, %d\n", rd, rs1, imm);
+                break;
+            case 0x23: // S-type
+                imm = ((instruction >> 25) << 5) | ((instruction >> 7) & 0x1F);
+                switch (funct3) {
+                    case 0x0: printf("sb "); break;
+                    case 0x1: printf("sh "); break;
+                    case 0x2: printf("sw "); break;
+                }
+                printf("x%d, %d(x%d)\n", rs2, imm, rs1);
+                break;
+            default:
+                printf("unknown instruction\n");
+        }
+    }
 }
 
 
