@@ -527,9 +527,11 @@ void print_program(){
 	/*IMPLEMENT THIS*/
 	/* execute one instruction at a time. Use/update CURRENT_STATE and and NEXT_STATE, as necessary.*/
 	uint32_t addr;
-    for(addr = CURRENT_STATE.PC; addr < MEM_TEXT_END; addr += 4){
+    for(addr = CURRENT_STATE.PC; addr < MEM_TEXT_END; addr += 4){ // loop through each instruction in memory
+		// read the instruction from memory
         uint32_t instruction = mem_read_32(addr);
 
+		// shift to find the opcode, rd, funct3, rs1, rs2, and funct7
         uint32_t opcode = instruction & 0x7F;
         uint32_t rd = (instruction >> 7) & 0x1F;
         uint32_t funct3 = (instruction >> 12) & 0x7;
@@ -539,12 +541,14 @@ void print_program(){
 
         int32_t imm; // immediate value
 
-		if (opcode == 00000000) { // kind of hard coded? not sure what to do here but this is a band-aid for now
+		if (opcode == 00000000) { // detects whether the opcode is all zero, which would be illegal and mean the end of the program
 			break;
 		}
 
+		// print the address and the instruction
         printf("%08x: %08x ", addr, instruction);
 
+		// print the instruction in assembly format by using the opcode to determine the type of instruction
         switch (opcode) {
             case 0x33: // R-type
                 switch (funct3) {
@@ -602,7 +606,7 @@ void print_program(){
                 }
                 printf("x%d, %d(x%d)\n", rs2, imm, rs1);
                 break;
-            default:
+            default: // unknown instruction
                 printf("unknown instruction\n");
         }
     }
