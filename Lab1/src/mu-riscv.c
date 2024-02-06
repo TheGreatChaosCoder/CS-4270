@@ -457,16 +457,15 @@ void U_Processing() {
 }
 
 /************************************************************/
-/* decode and execute instruction                                                                     */ 
+/* decode and execute instruction                           */ 
 /************************************************************/
 void handle_instruction()
 {
-	/*IMPLEMENT THIS*/
-	/* execute one instruction at a time. Use/update CURRENT_STATE and and NEXT_STATE, as necessary.*/
-
+	// Read the instruction at the address in the program counter
 	uint32_t instruction = mem_read_32(CURRENT_STATE.PC);
 
-	uint8_t opcode_bitmask = 0x7f; //0111 1111  to low quarter word
+	// Read opcode
+	uint8_t opcode_bitmask = 0x7f; //0111 1111 to low quarter word
 	uint8_t opcode = instruction & opcode_bitmask;
 
 	switch(opcode)
@@ -500,11 +499,12 @@ void handle_instruction()
 		);
 		break;
 
-	default: // =Invalid opcode or zero
+	default: // Unrecognized opcode or zero instruction
 		RUN_FLAG = FALSE;
 		break;
 	}
 
+	//Increment to next instruction
 	NEXT_STATE.PC += 4;
 }
 
