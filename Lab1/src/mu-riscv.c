@@ -500,8 +500,8 @@ void handle_instruction()
 		);
 		break;
 
-	default:
-		printf("%d\n", opcode );
+	default: // =Invalid opcode or zero
+		RUN_FLAG = FALSE;
 		break;
 	}
 
