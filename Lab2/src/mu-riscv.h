@@ -22,6 +22,9 @@
 #define MEM_STACK_BEGIN 0x7FFFFFFF
 #define MEM_STACK_END  0x10010000
 
+#ifdef __cplusplus
+extern "C"{
+#endif
 typedef struct {
 	uint32_t begin, end;
 	uint8_t *mem;
@@ -73,7 +76,12 @@ void handle_command();
 void reset();
 void init_memory();
 void load_program();
-void handle_instruction(); /*IMPLEMENT THIS*/
+uint32_t assemble_instruction(char* instruction, uint_32 address)
+void handle_instruction();
 void initialize();
-void print_program(); /*IMPLEMENT THIS*/
+void print_program(); 
 void print_instruction(uint32_t);
+
+#ifdef __cplusplus
+}
+#endif
