@@ -5,6 +5,7 @@
 #include <assert.h>
 
 #include "mu-riscv.h"
+#include "mu-assem.h"
 
 /***************************************************************/
 /* Print out a list of commands available                                                                  */
@@ -293,6 +294,7 @@ void init_memory() {
 void load_program() {                   
 	FILE * fp;
 	int i, word;
+	char str_buffer[100];
 	uint32_t address;
 	/* Open program file. */
 	fp = fopen(prog_file, "r");
@@ -524,7 +526,6 @@ void initialize() {
 /* Print the program loaded into memory (in RISCV assembly format)    */ 
 /************************************************************/
 void print_program(){
-	/*IMPLEMENT THIS*/
 	/* execute one instruction at a time. Use/update CURRENT_STATE and and NEXT_STATE, as necessary.*/
 	uint32_t addr;
     for(addr = CURRENT_STATE.PC; addr < MEM_TEXT_END; addr += 4){
