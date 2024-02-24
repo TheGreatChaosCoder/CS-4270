@@ -116,7 +116,7 @@ inline std::string I_assemble_instruction(std::string instruction, std::string i
         opcode = "0010011"; f3 = "001";
     }
     else if(instruction == "lw"){
-        opcode = "0010011"; f3 = "010";
+        opcode = "0000011"; f3 = "010";
     }
     else{ //invalid instruction
         return NULL;
@@ -138,9 +138,6 @@ inline std::string J_assemble_instruction(std::string instruction, std::string i
     //Get opcode for each instruction
     if(instruction=="jal" || instruction =="j"){
         opcode = "1101111";
-    }
-    else if(instruction == "jalr"){
-        opcode = "1100111";
     }
     else{ //invalid instruction
         return NULL;
@@ -167,7 +164,7 @@ std::string convert_to_machine_code(const std::string instruction, std::string r
     else if(instruction == "addi" || instruction == "slli" || instruction == "lw"){
         machine_code_bin = I_assemble_instruction(instruction, rs2_or_imm, rd, rs1);
     } 
-    else if(instruction == "jal" || instruction == "j" || instruction == "jalr"){
+    else if(instruction == "jal" || instruction == "j"){
         machine_code_bin = J_assemble_instruction(instruction, std::to_string(branch_map[rs2_or_imm]), rd);
     }
     else if(instruction == "bge"){

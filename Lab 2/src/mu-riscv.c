@@ -446,12 +446,32 @@ void S_Processing(uint32_t imm4, uint32_t f3, uint32_t rs1, uint32_t rs2, uint32
 	}
 }
 
-void B_Processing() {
-	// hi
+void B_Processing(uint32_t imm11, uint32_t imm4, uint32_t f3, uint32_t rs1, uint32_t rs2, uint32_t imm10, uint32_t imm12) {
+	//recombine immediates
+	uint32_t imm = (imm12 << 12) + (imm11 << 11) + (imm10 << 5) + (imm4 << 1);
+
+	switch (f3)
+	{
+		case 5: //bge
+			if(NEXT_STATE.REGS[rs1] >= NEXT_STATE.REGS[rs2]){
+				NEXT_STATE.PC += imm;
+			}
+			break;
+		default:
+			printf("Invalid instruction");
+			RUN_FLAG = FALSE;
+			break;
+	}
 }
 
-void J_Processing() {
-	// hi
+void J_Processing(uint32_t imm20, uint32_t imm10, uint32_t imm11, uint32_t imm19, uint32_t rd) {
+	//recombine immediate
+	uint32_t imm = (imm20<< 20) + (imm19 << 12) + (imm11 << 11) + (imm10 << 1);
+
+	//jal/j is the only J-type instruction needed
+	NEXT_STATE.REGS[rd] = NEXT_STATE.PC + 4;
+	NEXT_STATE.PC += imm;
+
 }
 
 void U_Processing() {
@@ -491,13 +511,33 @@ void handle_instruction()
 		);
 		break;
 
-	case 0x23: ;//S-type Store Instruction
+	case 0x23: //S-type Store Instruction
 		S_Processing(
 			(instruction & 0xF80) >> 7, // imm[4:0]
 			(instruction & 0x7000) >> 12, //f3
 			(instruction & 0xF80000) >> 15, //rs1
 			(instruction & 0x1F00000) >> 20, //rs2
 			(instruction & 0xFE000000) >> 25 // imm[11:5]
+		);
+		break;
+	case 0x63: //B-type Branch Instruction
+		B_Processing(
+			(instruction & 0x80) >> 7, // imm[11]
+			(instruction & 0xF00) >> 8, // imm[4:1]
+			(instruction & 0x7000) >> 12, // f3
+			(instruction & 0xF80000) >> 15, //rs1
+			(instruction & 0x1F00000) >> 20, //rs2
+			(instruction & 0x7E000000) >> 25, // imm[10:5]
+			(instruction & 0x80000000) >> 31  // imm[12]
+		);
+		break;
+	case 0x6F: //J-type Jump Instruction
+		J_Processing(
+			(instruction & 0xF80) >> 7, //rd
+			(instruction & 0xFF000) >> 12, //imm[19:12] // 0000 1111 1111 0000 0000 0000 
+			(instruction & 0x00100000) >> 20, //imm[11]
+			(instruction & 0x7FE00000) >> 21, //imm[10:1]
+			(instruction & 0x80000000) >> 31 //imm[20]
 		);
 		break;
 
