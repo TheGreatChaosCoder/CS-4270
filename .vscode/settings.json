@@ -59,6 +59,7 @@
   "files.associations": {
     "mu-assem.h": "c",
     "iostream": "cpp",
-    "xtree": "cpp"
+    "xtree": "cpp",
+    "vector": "cpp"
   }
 }

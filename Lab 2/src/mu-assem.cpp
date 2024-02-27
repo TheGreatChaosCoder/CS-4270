@@ -211,7 +211,7 @@ std::string convert_to_machine_code(const std::string instruction, std::string r
 
 std::string save_to_file(const std::string& machine_code){
     std::ofstream output_file;
-    output_file.open("../output/output.txt", std::ios_base::app);
+    output_file.open("../output/output.txt", std::ios_base::app); // append machine code to txt
     output_file << machine_code << std::endl;
     output_file.close();
     return machine_code;
@@ -234,6 +234,14 @@ void print_machine_code(const std::vector<std::string>& tokens) {
     {
         std::cout << save_to_file(convert_to_machine_code(tokens[0], "zero", "None", tokens[1])) << std::endl;
     }
+}
+
+void prep_file(const std::string filename)
+{
+    // clean up file before writing
+    std::ofstream output_file;
+    output_file.open("../output/output.txt", std::ios::out);
+    output_file.close();
 }
 
 void set_branch_label(const std::string& line, const uint32_t program_counter){
@@ -276,11 +284,13 @@ int main(int argc, char* argv[]) {
             program_counter += 4;
         }
     }
+    
     std::cout << "\nCONVERTED TO MACHINE CODE:" << std::endl;
+    prep_file("../output/output.txt");
     for (auto i = instruction_file.begin(); i != instruction_file.end(); i++)
     {
         print_machine_code(i->second);
     }
-
+    std::cout << "\nMACHINE CODE DATA IS SAVED TO output/output.txt" << std::endl;
     return 0;
 }
