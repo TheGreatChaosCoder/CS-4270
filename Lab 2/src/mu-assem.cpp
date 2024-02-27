@@ -209,22 +209,30 @@ std::string convert_to_machine_code(const std::string instruction, std::string r
     return ss.str();
 }
 
+std::string save_to_file(const std::string& machine_code){
+    std::ofstream output_file;
+    output_file.open("../output/output.txt", std::ios_base::app);
+    output_file << machine_code << std::endl;
+    output_file.close();
+    return machine_code;
+}
+
 void print_machine_code(const std::vector<std::string>& tokens) {
     //const std::string instruction, std::string rd, std::string rs1, std::string rs2_or_imm
     if(tokens.size() == 4) //Instruction - convert to machine code
     {
-        std::cout << convert_to_machine_code(tokens[0], tokens[1], tokens[2], tokens[3]) << std::endl;
+        std::cout << save_to_file(convert_to_machine_code(tokens[0], tokens[1], tokens[2], tokens[3])) << std::endl;
     }
     else if(tokens.size() == 3) //immediate - parse to get immediate and rs1
     {
         std::string rs1 = tokens[2].substr(tokens[2].find("(")+1,tokens[2].find(")"));
         std::string imm = tokens[2].substr(0, tokens[2].find("(x"));
 
-        std::cout << convert_to_machine_code(tokens[0], tokens[1], rs1, imm) << std::endl;
+        std::cout << save_to_file(convert_to_machine_code(tokens[0], tokens[1], rs1, imm)) << std::endl;
     }
     else if(tokens.size() == 2) //j instruction - set rd=x0
     {
-        std::cout << convert_to_machine_code(tokens[0], "zero", "None", tokens[1]) << std::endl;
+        std::cout << save_to_file(convert_to_machine_code(tokens[0], "zero", "None", tokens[1])) << std::endl;
     }
 }
 
