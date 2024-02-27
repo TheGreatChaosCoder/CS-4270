@@ -76,7 +76,7 @@ void handle_command();
 void reset();
 void init_memory();
 void load_program();
-uint32_t assemble_instruction(char* instruction, uint_32 address)
+uint32_t assemble_instruction(char* instruction, uint32_t address);
 void handle_instruction();
 void initialize();
 void print_program(); 

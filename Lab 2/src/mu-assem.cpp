@@ -81,6 +81,9 @@ inline std::string B_assemble_instruction(std::string instruction, std::string r
     if(instruction == "bge"){
         f3 = "101";
     }
+     else if(instruction == "blt"){ // blt
+        f3 = "100";
+    }
     else{ //invalid instruction
         return NULL;
     }
@@ -154,6 +157,30 @@ inline std::string J_assemble_instruction(std::string instruction, std::string i
     return assemble_instruction;
 }
 
+inline std::string S_assemble_instruction(std::string instruction, std::string rs1, std::string rs2, std::string imm){
+    std::string opcode = "0100011";
+    std::string f3;
+
+    //Get opcode and funct3 for each instruction
+    if(instruction == "sw"){
+        f3 = "010";
+    }
+    else{ //invalid instruction
+        return NULL;
+    }
+
+    //Creating the instruction
+    imm = to_binary(std::stoi(imm), 12);
+    std::string assemble_instruction = imm.substr(12-11-1,11-5+1); //[11:5]
+    assemble_instruction += to_binary(register_map[rs2], 5);
+    assemble_instruction += to_binary(register_map[rs1], 5);
+    assemble_instruction += f3;
+    assemble_instruction += imm.substr(12-4-1,4-0+1); //[4:0]
+    assemble_instruction += opcode;
+
+    return assemble_instruction;
+}
+
 std::string convert_to_machine_code(const std::string instruction, std::string rd, std::string rs1, std::string rs2_or_imm) {
     std::string machine_code_bin;
 
@@ -167,8 +194,14 @@ std::string convert_to_machine_code(const std::string instruction, std::string r
     else if(instruction == "jal" || instruction == "j"){
         machine_code_bin = J_assemble_instruction(instruction, std::to_string(branch_map[rs2_or_imm]), rd);
     }
-    else if(instruction == "bge"){
+    else if(instruction == "bge" || instruction == "blt"){
         machine_code_bin = B_assemble_instruction(instruction, rd, rs1, rs2_or_imm); //rd=rs1, rs1=rs2
+    }
+    else if(instruction == "sw"){ // Add support for sw instruction
+        machine_code_bin = S_assemble_instruction(instruction, rd, rs1, rs2_or_imm); //rd=rs1, rs1=rs2
+    }
+    else{
+        return "Invalid instruction";
     }
     
     std::stringstream ss;
@@ -235,7 +268,7 @@ int main(int argc, char* argv[]) {
             program_counter += 4;
         }
     }
-
+    std::cout << "\nCONVERTED TO MACHINE CODE:" << std::endl;
     for (auto i = instruction_file.begin(); i != instruction_file.end(); i++)
     {
         print_machine_code(i->second);

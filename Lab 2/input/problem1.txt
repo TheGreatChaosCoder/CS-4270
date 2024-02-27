@@ -1,0 +1,56 @@
+# Assume x8 holds pointer to A
+# Assign x10 = i, x11 = j, x12 = temp
+
+# Initialize i to 0
+add x10, zero, zero # i = 0
+
+# Set x9 to 9 (the size of the array - 1)
+addi x9, zero, 9 # x9 = 9
+
+# Start of the outer loop
+outer_loop:
+# If i >= 9, exit the outer loop
+bge x10, x9, exit_outer_loop
+
+# Initialize j to 0
+add x11, zero, zero # j = 0
+
+# Start of the inner loop
+inner_loop:
+# If j >= 9, exit the inner loop
+bge x11, x9, exit_inner_loop:
+
+# Calculate the address of A[j] and store it in x12
+sll x12, x11, 2 # j * 4
+add x12, x12, x8 # &A[j]
+
+# Load the value of A[j] into x13
+lw x13, 0(x12) # A[j]
+
+# Load the value of A[j+1] into x14
+lw x14, 4(x12) # A[j+1]
+
+# If A[j] > A[j+1], perform the swap
+blt x14, x13, perform_swap:
+
+# Skip the swap
+j skip_swap
+
+# Label for performing the swap
+perform_swap:
+# Swap A[j] and A[j+1]
+# Label for skipping the swap
+skip_swap:
+# Increment j
+addi x11, x11, 1 # j++
+# Jump back to the start of the inner loop
+j inner_loop
+# Label for exiting the inner loop
+exit_inner_loop:
+# Increment i
+addi x10, x10, 1 # i++
+# Jump back to the start of the outer loop
+j outer_loop
+
+# Label for exiting the outer loop
+exit_outer_loop:

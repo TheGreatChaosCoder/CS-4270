@@ -294,7 +294,7 @@ void init_memory() {
 void load_program() {                   
 	FILE * fp;
 	int i, word;
-	char str_buffer[100];
+	//char str_buffer[100];
 	uint32_t address;
 	/* Open program file. */
 	fp = fopen(prog_file, "r");
