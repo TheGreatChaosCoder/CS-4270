@@ -81,6 +81,9 @@ inline std::string B_assemble_instruction(std::string instruction, std::string r
     if(instruction == "bge"){
         f3 = "101";
     }
+     else if(instruction == "blt"){ // blt
+        f3 = "100";
+    }
     else{ //invalid instruction
         return NULL;
     }
@@ -157,6 +160,30 @@ inline std::string J_assemble_instruction(std::string instruction, std::string i
     return assemble_instruction;
 }
 
+inline std::string S_assemble_instruction(std::string instruction, std::string rs1, std::string rs2, std::string imm){
+    std::string opcode = "0100011";
+    std::string f3;
+
+    //Get opcode and funct3 for each instruction
+    if(instruction == "sw"){
+        f3 = "010";
+    }
+    else{ //invalid instruction
+        return NULL;
+    }
+
+    //Creating the instruction
+    imm = to_binary(std::stoi(imm), 12);
+    std::string assemble_instruction = imm.substr(12-11-1,11-5+1); //[11:5]
+    assemble_instruction += to_binary(register_map[rs2], 5);
+    assemble_instruction += to_binary(register_map[rs1], 5);
+    assemble_instruction += f3;
+    assemble_instruction += imm.substr(12-4-1,4-0+1); //[4:0]
+    assemble_instruction += opcode;
+
+    return assemble_instruction;
+}
+
 std::string convert_to_machine_code(const std::string instruction, std::string rd, std::string rs1, std::string rs2_or_imm, uint32_t PC) {
     std::string machine_code_bin;
 
@@ -172,8 +199,16 @@ std::string convert_to_machine_code(const std::string instruction, std::string r
         printf("Branch Address: %i\n", branch_map[rs2_or_imm]);
         machine_code_bin = J_assemble_instruction(instruction, std::to_string(branch_map[rs2_or_imm]), rd, PC);
     }
+    else if(instruction == "bge" || instruction == "blt"){
+        machine_code_bin = B_assemble_instruction(instruction, rd, rs1, rs2_or_imm); //rd=rs1, rs1=rs2
     else if(instruction == "bge"){
         machine_code_bin = B_assemble_instruction(instruction, rd, rs1, rs2_or_imm, PC); //rd=rs1, rs1=rs2
+    }
+    else if(instruction == "sw"){ // Add support for sw instruction
+        machine_code_bin = S_assemble_instruction(instruction, rd, rs1, rs2_or_imm); //rd=rs1, rs1=rs2
+    }
+    else{
+        return "Invalid instruction";
     }
     
     std::stringstream ss;
@@ -181,10 +216,19 @@ std::string convert_to_machine_code(const std::string instruction, std::string r
     return ss.str();
 }
 
+std::string save_to_file(const std::string& machine_code){
+    std::ofstream output_file;
+    output_file.open("../output/output.txt", std::ios_base::app); // append machine code to txt
+    output_file << machine_code << std::endl;
+    output_file.close();
+    return machine_code;
+}
+
 void print_machine_code(const std::vector<std::string>& tokens, uint32_t PC) {
     //const std::string instruction, std::string rd, std::string rs1, std::string rs2_or_imm
     if(tokens.size() == 4) //Instruction - convert to machine code
     {
+        std::cout << save_to_file(convert_to_machine_code(tokens[0], tokens[1], tokens[2], tokens[3])) << std::endl;
         std::cout << convert_to_machine_code(tokens[0], tokens[1], tokens[2], tokens[3], PC) << std::endl;
     }
     else if(tokens.size() == 3) //immediate - parse to get immediate and rs1
@@ -196,12 +240,30 @@ void print_machine_code(const std::vector<std::string>& tokens, uint32_t PC) {
 
         //printf("immediate token: %s, rs1: %s, imm: %s\n", tokens[2].c_str(), rs1.c_str(), imm.c_str());
 
+        std::cout << save_to_file(convert_to_machine_code(tokens[0], tokens[1], rs1, imm)) << std::endl;
         std::cout << convert_to_machine_code(tokens[0], tokens[1], rs1, imm, PC) << std::endl;
     }
     else if(tokens.size() == 2) //j instruction - set rd=x0
     {
+        std::cout << save_to_file(convert_to_machine_code(tokens[0], "zero", "None", tokens[1])) << std::endl;
         std::cout << convert_to_machine_code(tokens[0], "zero", "None", tokens[1], PC) << std::endl;
     }
+}
+
+void prep_file(const std::string filename)
+{
+    // clean up file before writing
+    std::ofstream output_file;
+    output_file.open("../output/output.txt", std::ios::out);
+    output_file.close();
+}
+
+void prep_file(const std::string filename)
+{
+    // clean up file before writing
+    std::ofstream output_file;
+    output_file.open("../output/output.txt", std::ios::out);
+    output_file.close();
 }
 
 void set_branch_label(const std::string& line, const uint32_t program_counter){
@@ -244,11 +306,13 @@ int main(int argc, char* argv[]) {
             program_counter += 4;
         }
     }
-
+    
+    std::cout << "\nCONVERTED TO MACHINE CODE:" << std::endl;
+    prep_file("../output/output.txt");
     for (auto i = instruction_file.begin(); i != instruction_file.end(); i++)
     {
         print_machine_code(i->second, i->first);
     }
-
+    std::cout << "\nMACHINE CODE DATA IS SAVED TO output/output.txt" << std::endl;
     return 0;
 }
