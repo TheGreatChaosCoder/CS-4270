@@ -73,7 +73,7 @@ inline std::string R_assemble_instruction(std::string instruction, std::string r
     return assemble_instruction;
 }
 
-inline std::string B_assemble_instruction(std::string instruction, std::string rs1, std::string rs2, std::string imm){
+inline std::string B_assemble_instruction(std::string instruction, std::string rs1, std::string rs2, std::string imm, uint32_t PC){
     std::string opcode = "1100011";
     std::string f3;
 
@@ -91,7 +91,7 @@ inline std::string B_assemble_instruction(std::string instruction, std::string r
     printf("Branch Address: %i\n", branch_map[imm]);
 
     //Creating the instruction
-    imm = to_binary(address, 13);
+    imm = to_binary(address - PC - 4, 13);
     std::string assemble_instruction = imm.substr(13-12-1,1); //[12]
     assemble_instruction += imm.substr(13-10-1,10-5+1); //[10:5]
     assemble_instruction += to_binary(register_map[rs2], 5);
@@ -132,7 +132,7 @@ inline std::string I_assemble_instruction(std::string instruction, std::string i
     return assemble_instruction;
 }
 
-inline std::string J_assemble_instruction(std::string instruction, std::string imm, std::string rd){
+inline std::string J_assemble_instruction(std::string instruction, std::string imm, std::string rd, uint32_t PC){
     std::string opcode;
 
     //Get opcode for each instruction
@@ -143,7 +143,10 @@ inline std::string J_assemble_instruction(std::string instruction, std::string i
         return NULL;
     }
 
-    imm = to_binary(std::stoi(imm), 21);
+    //printf("PC = %d, imm = %d, offset = %d\n", PC, std::stoi(imm), std::stoi(imm) - PC - 4);
+
+    imm = to_binary(std::stoi(imm)- PC - 4, 21);
+    printf("imm = %s\n", imm.c_str());
     std::string assemble_instruction = imm.substr(21-20-1,1); //[20]
     assemble_instruction +=  imm.substr(21-10-1,10-1+1); //[10:1]
     assemble_instruction += imm[21-11-1]; //[11]
@@ -154,7 +157,7 @@ inline std::string J_assemble_instruction(std::string instruction, std::string i
     return assemble_instruction;
 }
 
-std::string convert_to_machine_code(const std::string instruction, std::string rd, std::string rs1, std::string rs2_or_imm) {
+std::string convert_to_machine_code(const std::string instruction, std::string rd, std::string rs1, std::string rs2_or_imm, uint32_t PC) {
     std::string machine_code_bin;
 
         //select instruction type
@@ -165,10 +168,12 @@ std::string convert_to_machine_code(const std::string instruction, std::string r
         machine_code_bin = I_assemble_instruction(instruction, rs2_or_imm, rd, rs1);
     } 
     else if(instruction == "jal" || instruction == "j"){
-        machine_code_bin = J_assemble_instruction(instruction, std::to_string(branch_map[rs2_or_imm]), rd);
+        printf("Branching: %s\n", rs2_or_imm.c_str());
+        printf("Branch Address: %i\n", branch_map[rs2_or_imm]);
+        machine_code_bin = J_assemble_instruction(instruction, std::to_string(branch_map[rs2_or_imm]), rd, PC);
     }
     else if(instruction == "bge"){
-        machine_code_bin = B_assemble_instruction(instruction, rd, rs1, rs2_or_imm); //rd=rs1, rs1=rs2
+        machine_code_bin = B_assemble_instruction(instruction, rd, rs1, rs2_or_imm, PC); //rd=rs1, rs1=rs2
     }
     
     std::stringstream ss;
@@ -176,22 +181,26 @@ std::string convert_to_machine_code(const std::string instruction, std::string r
     return ss.str();
 }
 
-void print_machine_code(const std::vector<std::string>& tokens) {
+void print_machine_code(const std::vector<std::string>& tokens, uint32_t PC) {
     //const std::string instruction, std::string rd, std::string rs1, std::string rs2_or_imm
     if(tokens.size() == 4) //Instruction - convert to machine code
     {
-        std::cout << convert_to_machine_code(tokens[0], tokens[1], tokens[2], tokens[3]) << std::endl;
+        std::cout << convert_to_machine_code(tokens[0], tokens[1], tokens[2], tokens[3], PC) << std::endl;
     }
     else if(tokens.size() == 3) //immediate - parse to get immediate and rs1
     {
-        std::string rs1 = tokens[2].substr(tokens[2].find("(")+1,tokens[2].find(")"));
-        std::string imm = tokens[2].substr(0, tokens[2].find("(x"));
+        int startIdx = tokens[2].find("(")+1;
+        int endIdx = tokens[2].find(")");
+        std::string rs1 = tokens[2].substr(startIdx, endIdx - startIdx);
+        std::string imm = tokens[2].substr(0, startIdx-1);
 
-        std::cout << convert_to_machine_code(tokens[0], tokens[1], rs1, imm) << std::endl;
+        //printf("immediate token: %s, rs1: %s, imm: %s\n", tokens[2].c_str(), rs1.c_str(), imm.c_str());
+
+        std::cout << convert_to_machine_code(tokens[0], tokens[1], rs1, imm, PC) << std::endl;
     }
     else if(tokens.size() == 2) //j instruction - set rd=x0
     {
-        std::cout << convert_to_machine_code(tokens[0], "zero", "None", tokens[1]) << std::endl;
+        std::cout << convert_to_machine_code(tokens[0], "zero", "None", tokens[1], PC) << std::endl;
     }
 }
 
@@ -224,11 +233,11 @@ int main(int argc, char* argv[]) {
     uint32_t program_counter = MEM_TEXT_BEGIN;
 
     while(std::getline(input_file, line)){
-        printf("%s\n", line.c_str());
         std::vector<std::string> tokens = tokenize(line);
 
         if(tokens.size()==1){ //record label for branching
-            set_branch_label(line, program_counter);
+            set_branch_label(line, program_counter-4);
+            //minus four so when the instruction is executed, the PC increment will counter it
         }
         else if(tokens.size()>1){ //record tokens for instruction
             instruction_file[program_counter] = tokenize(line);
@@ -238,7 +247,7 @@ int main(int argc, char* argv[]) {
 
     for (auto i = instruction_file.begin(); i != instruction_file.end(); i++)
     {
-        print_machine_code(i->second);
+        print_machine_code(i->second, i->first);
     }
 
     return 0;
