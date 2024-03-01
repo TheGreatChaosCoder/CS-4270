@@ -5,6 +5,7 @@
 #include <assert.h>
 
 #include "mu-riscv.h"
+#include "mu-assem.h"
 
 /***************************************************************/
 /* Print out a list of commands available                                                                  */
@@ -40,6 +41,40 @@ uint32_t byte_to_word(uint8_t byte)
 uint32_t half_to_word(uint16_t half)
 {
     return (half & 0x8000) ? (half | 0xffff8000) : half;
+}
+
+int32_t signExtend_13b(uint32_t number)
+{
+    // Appending leading zeroes to
+    // the 23-bit number
+    int32_t ans = number & 0x00001FFF;
+ 
+    // Checking if sign-bit of number is 0 or 1
+    if (number & 0x00001000) {
+ 
+        // If number is negative, append
+        // leading 1's to the 21-bit sequence
+        ans = ans | 0xFFFFE000;
+    }
+ 
+    return ans;
+}
+
+int32_t signExtend_21b(uint32_t number)
+{
+    // Appending leading zeroes to
+    // the 21-bit number
+    int32_t ans = number & 0x001FFFFF;
+ 
+    // Checking if sign-bit of number is 0 or 1
+    if (number & 0x00100000) {
+ 
+        // If number is negative, append
+        // leading 1's to the 21-bit sequence
+        ans = ans | 0xFFE00000;
+    }
+ 
+    return ans;
 }
 
 /***************************************************************/
@@ -293,6 +328,7 @@ void init_memory() {
 void load_program() {                   
 	FILE * fp;
 	int i, word;
+	//char str_buffer[100];
 	uint32_t address;
 	/* Open program file. */
 	fp = fopen(prog_file, "r");
@@ -444,12 +480,32 @@ void S_Processing(uint32_t imm4, uint32_t f3, uint32_t rs1, uint32_t rs2, uint32
 	}
 }
 
-void B_Processing() {
-	// hi
+void B_Processing(uint32_t imm11, uint32_t imm4, uint32_t f3, uint32_t rs1, uint32_t rs2, uint32_t imm10, uint32_t imm12) {
+	//recombine immediates
+	uint32_t imm = (imm12 << 12) + (imm11 << 11) + (imm10 << 5) + (imm4 << 1);
+
+	switch (f3)
+	{
+		case 5: //bge
+			if(NEXT_STATE.REGS[rs1] >= NEXT_STATE.REGS[rs2]){
+				NEXT_STATE.PC += imm;
+			}
+			break;
+		default:
+			printf("Invalid instruction");
+			RUN_FLAG = FALSE;
+			break;
+	}
 }
 
-void J_Processing() {
-	// hi
+void J_Processing(uint32_t imm20, uint32_t imm10, uint32_t imm11, uint32_t imm19, uint32_t rd) {
+	//recombine immediate
+	uint32_t imm = (imm20<< 20) + (imm19 << 12) + (imm11 << 11) + (imm10 << 1);
+
+	//jal/j is the only J-type instruction needed
+	NEXT_STATE.REGS[rd] = NEXT_STATE.PC + 4;
+	NEXT_STATE.PC += imm;
+
 }
 
 void U_Processing() {
@@ -489,13 +545,33 @@ void handle_instruction()
 		);
 		break;
 
-	case 0x23: ;//S-type Store Instruction
+	case 0x23: //S-type Store Instruction
 		S_Processing(
 			(instruction & 0xF80) >> 7, // imm[4:0]
 			(instruction & 0x7000) >> 12, //f3
 			(instruction & 0xF80000) >> 15, //rs1
 			(instruction & 0x1F00000) >> 20, //rs2
 			(instruction & 0xFE000000) >> 25 // imm[11:5]
+		);
+		break;
+	case 0x63: //B-type Branch Instruction
+		B_Processing(
+			(instruction & 0x80) >> 7, // imm[11]
+			(instruction & 0xF00) >> 8, // imm[4:1]
+			(instruction & 0x7000) >> 12, // f3
+			(instruction & 0xF80000) >> 15, //rs1
+			(instruction & 0x1F00000) >> 20, //rs2
+			(instruction & 0x7E000000) >> 25, // imm[10:5]
+			(instruction & 0x80000000) >> 31  // imm[12]
+		);
+		break;
+	case 0x6F: //J-type Jump Instruction
+		J_Processing(
+			(instruction & 0xF80) >> 7, //rd
+			(instruction & 0xFF000) >> 12, //imm[19:12]
+			(instruction & 0x00100000) >> 20, //imm[11]
+			(instruction & 0x7FE00000) >> 21, //imm[10:1]
+			(instruction & 0x80000000) >> 31 //imm[20]
 		);
 		break;
 
@@ -524,9 +600,50 @@ void initialize() {
 /* Print the program loaded into memory (in RISCV assembly format)    */ 
 /************************************************************/
 void print_program(){
-	/*IMPLEMENT THIS*/
 	/* execute one instruction at a time. Use/update CURRENT_STATE and and NEXT_STATE, as necessary.*/
 	uint32_t addr;
+
+	uint32_t MAX_BRANCHES = 10;
+	uint32_t branches[MAX_BRANCHES];
+	uint32_t numBranches = 0;
+
+	//Have to check for branching beforehand so labels can be generated
+	for(addr = CURRENT_STATE.PC; addr < MEM_TEXT_END; addr += 4){
+        uint32_t instruction = mem_read_32(addr);
+
+        uint32_t opcode = instruction & 0x7F;
+		uint32_t imm = 0;
+		int32_t offset;
+
+		if(opcode == 0x63){ //B-type
+			imm += ((instruction & 0x80) >> 7) << 11; // imm[11]
+			imm += ((instruction & 0xF00) >> 8) << 1; // imm[4:1]
+			imm += ((instruction & 0x7E000000) >> 25) << 5; // imm[10:5]
+			imm += ((instruction & 0x80000000) >> 31) << 12;  // imm[12]
+
+			offset = signExtend_13b(imm);
+		}
+		else if(opcode == 0x6F){ //J-type
+			imm += ((instruction & 0xFF000) >> 12) << 12; //imm[19:12]
+			imm += ((instruction & 0x00100000) >> 20) << 11; //imm[11]
+			imm += ((instruction & 0x7FE00000) >> 21) << 1; //imm[10:1]
+			imm += ((instruction & 0x80000000) >> 31) << 20; //imm[20]
+
+			offset = signExtend_21b(imm);
+		}
+		else{
+			continue;
+		}
+
+		branches[numBranches] = addr + offset; //imm is the offset
+		numBranches++;
+
+		if(numBranches == MAX_BRANCHES){
+			printf("Too many branches for print_program() to handle \n");
+			return;
+		}
+	}
+
     for(addr = CURRENT_STATE.PC; addr < MEM_TEXT_END; addr += 4){
         uint32_t instruction = mem_read_32(addr);
 
@@ -537,7 +654,11 @@ void print_program(){
         uint32_t rs2 = (instruction >> 20) & 0x1F;
         uint32_t funct7 = (instruction >> 25) & 0x7F;
 
-        int32_t imm; // immediate value
+        uint32_t imm=0; // immediate value
+		int32_t offset; //offset for jumps
+		uint32_t branchAddress;
+
+		char branchHeader[] = "Br-";
 
 		if (opcode == 00000000) { // kind of hard coded? not sure what to do here but this is a band-aid for now
 			break;
@@ -602,9 +723,53 @@ void print_program(){
                 }
                 printf("x%d, %d(x%d)\n", rs2, imm, rs1);
                 break;
+			case 0x63: // B-type branching
+				imm += ((instruction & 0x80) >> 7) << 11; // imm[11]
+				imm += ((instruction & 0xF00) >> 8) << 1; // imm[4:1]
+				imm += ((instruction & 0x7E000000) >> 25) << 5; // imm[10:5]
+				imm += ((instruction & 0x80000000) >> 31) << 12;  // imm[12]
+
+				switch (funct3){
+					case 0x0: printf("beq "); break;
+					case 0x1: printf("bne "); break;
+					case 0x4: printf("blt "); break;
+					case 0x5: printf("bge "); break;
+					case 0x6: printf("bltu "); break;
+					case 0x7: printf("bgeu "); break;
+				}
+
+				offset = signExtend_13b(imm);
+				
+				//convert from unsigned to signed
+				branchAddress = addr + offset + 4;
+
+				printf("x%d, x%d, %s%d\n", rs1, rs2, branchHeader, branchAddress);
+				break;
+
+			case 0x6F: // J-type instruction (only jal)
+				imm += ((instruction & 0xFF000) >> 12) << 12; //imm[19:12]
+				imm += ((instruction & 0x00100000) >> 20) << 11; //imm[11]
+				imm += ((instruction & 0x7FE00000) >> 21) << 1; //imm[10:1]
+				imm += ((instruction & 0x80000000) >> 31) << 20; //imm[20]
+
+				offset = signExtend_21b(imm);
+				
+				//convert from unsigned to signed
+				branchAddress = addr + offset + 4;
+
+				printf("jal x%d, %s%i\n", rd, branchHeader, branchAddress);
+				break;
+
             default:
                 printf("unknown instruction\n");
         }
+
+		//Check to see if a branch is for this value of the PC
+		for(int i = 0; i<numBranches; i++){
+			if(branches[i] + 4 == addr){
+				printf("%s%d\n", branchHeader, addr);
+			}
+		}
     }
 }
 
