@@ -403,6 +403,7 @@ void ILoad_Processing(uint32_t rd, uint32_t f3, uint32_t rs1, uint32_t imm) {
 void Iimm_Processing(uint32_t rd, uint32_t f3, uint32_t rs1, uint32_t imm) {
 	uint32_t imm0_4 = (imm << 7) >> 7;
 	uint32_t imm5_11 = imm >> 5;
+
 	switch (f3)
 	{
 	case 0: //addi
@@ -483,12 +484,23 @@ void S_Processing(uint32_t imm4, uint32_t f3, uint32_t rs1, uint32_t rs2, uint32
 void B_Processing(uint32_t imm11, uint32_t imm4, uint32_t f3, uint32_t rs1, uint32_t rs2, uint32_t imm10, uint32_t imm12) {
 	//recombine immediates
 	uint32_t imm = (imm12 << 12) + (imm11 << 11) + (imm10 << 5) + (imm4 << 1);
+	int32_t offset = signExtend_13b(imm); //convert to signed
 
 	switch (f3)
 	{
 		case 5: //bge
 			if(NEXT_STATE.REGS[rs1] >= NEXT_STATE.REGS[rs2]){
-				NEXT_STATE.PC += imm;
+				NEXT_STATE.PC += offset;
+			}
+			break;
+		case 4: //blt:
+			if(NEXT_STATE.REGS[rs1] < NEXT_STATE.REGS[rs2]){
+				NEXT_STATE.PC += offset;
+			}
+			break;
+		case 0: // beq
+			if(NEXT_STATE.REGS[rs1] == NEXT_STATE.REGS[rs2]){
+				NEXT_STATE.PC += offset;
 			}
 			break;
 		default:
@@ -496,15 +508,18 @@ void B_Processing(uint32_t imm11, uint32_t imm4, uint32_t f3, uint32_t rs1, uint
 			RUN_FLAG = FALSE;
 			break;
 	}
+	printf("\n b offset = %x", NEXT_STATE.PC);
 }
 
 void J_Processing(uint32_t imm20, uint32_t imm10, uint32_t imm11, uint32_t imm19, uint32_t rd) {
 	//recombine immediate
-	uint32_t imm = (imm20<< 20) + (imm19 << 12) + (imm11 << 11) + (imm10 << 1);
+	uint32_t imm = (imm20 << 20) + (imm19 << 12) + (imm11 << 11) + (imm10 << 1);
+	int32_t offset = signExtend_21b(imm); //convert to signed
+	printf("\n%x, %x", imm, offset);
 
 	//jal/j is the only J-type instruction needed
 	NEXT_STATE.REGS[rd] = NEXT_STATE.PC + 4;
-	NEXT_STATE.PC += imm;
+	NEXT_STATE.PC += offset;
 
 }
 
@@ -536,12 +551,21 @@ void handle_instruction()
 		);
 		break;
 
-	case 0x03: //I-type Load Instruction
+	case 0x13://I-type Immediate Instruction
 		Iimm_Processing(
 			(instruction & 0xF80) >> 7, //rd
 			(instruction & 0x7000) >> 12, //f3
 			(instruction & 0xF80000) >> 15, //rs1
-			(instruction & 0xFFE00000) >> 20 //imm
+			(instruction & 0xFFF00000) >> 20 //imm
+		);
+		break;
+
+	case 0x03: //I-type Load Instruction:
+		ILoad_Processing(
+			(instruction & 0xF80) >> 7, //rd
+			(instruction & 0x7000) >> 12, //f3
+			(instruction & 0xF80000) >> 15, //rs1
+			(instruction & 0xFFF00000) >> 20 //imm
 		);
 		break;
 
@@ -743,7 +767,7 @@ void print_program(){
 				//convert from unsigned to signed
 				branchAddress = addr + offset + 4;
 
-				printf("x%d, x%d, %s%d\n", rs1, rs2, branchHeader, branchAddress);
+				printf("x%d, x%d, %s%x\n", rs1, rs2, branchHeader, branchAddress);
 				break;
 
 			case 0x6F: // J-type instruction (only jal)
@@ -757,7 +781,7 @@ void print_program(){
 				//convert from unsigned to signed
 				branchAddress = addr + offset + 4;
 
-				printf("jal x%d, %s%i\n", rd, branchHeader, branchAddress);
+				printf("jal x%d, %s%x\n", rd, branchHeader, branchAddress);
 				break;
 
             default:
@@ -766,8 +790,10 @@ void print_program(){
 
 		//Check to see if a branch is for this value of the PC
 		for(int i = 0; i<numBranches; i++){
-			if(branches[i] + 4 == addr){
-				printf("%s%d\n", branchHeader, addr);
+			// plus 4 to consider pc incrementing after j/b instruction ran
+			if(branches[i] + 4 == addr){ 
+				printf("%s%x\n", branchHeader, addr);
+				break; // don't need to print out multiple branches
 			}
 		}
     }

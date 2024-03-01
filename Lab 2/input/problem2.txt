@@ -1,0 +1,25 @@
+# Assign x10 = 10 (test input), x11 = i
+addi x10, x0, 10 # n = 10
+# Start of program after parameter passing
+add x11, x0, x0 # i = 0
+# Set x30 to 1 incase edge case of n=1 or n=2 is true
+addi x30, x0, 1
+# check if n = 1 or 2
+beq x10, x30, Exit # n=1
+addi x31, x0, 2
+beq x10, x31, Exit # n = 2
+addi x11, x0, 1 # i = 0
+# Set initial values to x28 and x29
+addi x28, x0, 0 # f1=0
+addi x29, x0, 1 # f2=1
+Loop:
+blt x10, x11, Exit # n < i -> Exit loop
+# Store result in x12
+add x30, x28, x29 # Fn = Fn-2 + Fn-1
+addi x28, x29, 0 # Swap values
+addi x29, x30, 0
+addi x11, x11, 1
+j Loop
+Exit:
+# Store result in x11
+add x11, x30, x0
