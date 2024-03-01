@@ -229,7 +229,6 @@ void print_machine_code(const std::vector<std::string>& tokens, uint32_t PC) {
         int endIdx = tokens[2].find(")");
         std::string rs1 = tokens[2].substr(startIdx, endIdx - startIdx);
         std::string imm = tokens[2].substr(0, startIdx-1);
-
         std::cout << save_to_file(convert_to_machine_code(tokens[0], tokens[1], rs1, imm, PC)) << std::endl;
     }
     else if(tokens.size() == 2) //j instruction - set rd=x0
