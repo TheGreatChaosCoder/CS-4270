@@ -139,7 +139,7 @@ void rdump() {
 	printf("-------------------------------------\n");
 	printf("[Register]\t[Value]\n");
 	printf("-------------------------------------\n");
-	for (i = 0; i < RISCV_REGS; i++){
+	for (i = 0; i < MIPS_REGS; i++){
 		printf("[R%d]\t: 0x%08x\n", i, CURRENT_STATE.REGS[i]);
 	}
 	printf("-------------------------------------\n");
@@ -243,7 +243,7 @@ void handle_command() {
 void reset() {
 	int i;
 	/*reset registers*/
-	for (i = 0; i < RISCV_REGS; i++){
+	for (i = 0; i < MIPS_REGS; i++){
 		CURRENT_STATE.REGS[i] = 0;
 	}
 	CURRENT_STATE.HI = 0;
@@ -378,224 +378,136 @@ void initialize() {
 	RUN_FLAG = TRUE;
 }
 
+//Returns 0 if not an all-zero instruction, 1 otherwise
+uint8_t print_instruction(const uint32_t instruction, const uint8_t printAddress, const uint32_t addr){
+	uint32_t opcode = instruction & 0x7F;
+    uint32_t rd = (instruction >> 7) & 0x1F;
+    uint32_t funct3 = (instruction >> 12) & 0x7;
+    uint32_t rs1 = (instruction >> 15) & 0x1F;
+    uint32_t rs2 = (instruction >> 20) & 0x1F;
+    uint32_t funct7 = (instruction >> 25) & 0x7F;
+
+	if (opcode == 00000000) { // kind of hard coded? not sure what to do here but this is a band-aid for now
+		return 1;
+	}
+
+	if(printAddress){
+    	printf("%08x: %08x ", addr, instruction);
+	}
+
+	uint32_t imm = 0;
+
+    switch (opcode) {
+        case 0x33: // R-type
+            switch (funct3) {
+                case 0x0:
+                    if (funct7 == 0x00) printf("add ");
+                    else if (funct7 == 0x20) printf("sub ");
+                    break;
+                case 0x1: printf("sll "); break;
+                case 0x2: printf("slt "); break;
+                case 0x3: printf("sltu "); break;
+                case 0x4: printf("xor "); break;
+                case 0x5:
+                    if (funct7 == 0x00) printf("srl ");
+                    else if (funct7 == 0x20) printf("sra ");
+                    break;
+                case 0x6: printf("or "); break;
+                case 0x7: printf("and "); break;
+                }
+                printf("x%d, x%d, x%d\n", rd, rs1, rs2);
+                break;
+        case 0x03: // I-type (load)
+            imm = (instruction >> 20);
+            switch (funct3) {
+                case 0x0: printf("lb "); break;
+                case 0x1: printf("lh "); break;
+                case 0x2: printf("lw "); break;
+                case 0x4: printf("lbu "); break;
+                case 0x5: printf("lhu "); break;
+            }
+            printf("x%d, %d(x%d)\n", rd, imm, rs1);
+            break;
+        case 0x13: // I-type (addi, slti, sltiu, xori, ori, andi, slli, srli, srai)
+            imm = (instruction >> 20);
+            switch (funct3) {
+                case 0x0: printf("addi "); break;
+                case 0x2: printf("slti "); break;
+                case 0x3: printf("sltiu "); break;
+                case 0x4: printf("xori "); break;
+                case 0x6: printf("ori "); break;
+                case 0x7: printf("andi "); break;
+                case 0x1: printf("slli "); break;
+                case 0x5:
+                    if (funct7 == 0x00) printf("srli ");
+                    else if (funct7 == 0x20) printf("srai ");                        
+					break;
+                }
+            printf("x%d, x%d, %d\n", rd, rs1, imm);
+            break;
+        case 0x23: // S-type
+            imm = ((instruction >> 25) << 5) | ((instruction >> 7) & 0x1F);
+            switch (funct3) {
+                case 0x0: printf("sb "); break;
+                case 0x1: printf("sh "); break;
+                case 0x2: printf("sw "); break;
+			}
+            printf("x%d, %d(x%d)\n", rs2, imm, rs1);
+            break;
+
+        default:
+            printf("unknown instruction\n");
+    }
+	return 0;
+}
+
 /************************************************************/
 /* Print the program loaded into memory (in RISCV assembly format)    */
 /************************************************************/
-int32_t signExtend_13b(uint32_t number)
-{
-    // Appending leading zeroes to
-    // the 23-bit number
-    int32_t ans = number & 0x00001FFF;
- 
-    // Checking if sign-bit of number is 0 or 1
-    if (number & 0x00001000) {
- 
-        // If number is negative, append
-        // leading 1's to the 21-bit sequence
-        ans = ans | 0xFFFFE000;
-    }
- 
-    return ans;
-}
-
-int32_t signExtend_21b(uint32_t number)
-{
-    // Appending leading zeroes to
-    // the 21-bit number
-    int32_t ans = number & 0x001FFFFF;
- 
-    // Checking if sign-bit of number is 0 or 1
-    if (number & 0x00100000) {
- 
-        // If number is negative, append
-        // leading 1's to the 21-bit sequence
-        ans = ans | 0xFFE00000;
-    }
- 
-    return ans;
-}
-
 void print_program(){
 	/* execute one instruction at a time. Use/update CURRENT_STATE and and NEXT_STATE, as necessary.*/
 	uint32_t addr;
 
-	uint32_t MAX_BRANCHES = 10;
-	uint32_t branches[MAX_BRANCHES];
-	uint32_t numBranches = 0;
-
-	//Have to check for branching beforehand so labels can be generated
-	for(addr = CURRENT_STATE.PC; addr < MEM_TEXT_END; addr += 4){
-        uint32_t instruction = mem_read_32(addr);
-
-        uint32_t opcode = instruction & 0x7F;
-		uint32_t imm = 0;
-		int32_t offset;
-
-		if(opcode == 0x63){ //B-type
-			imm += ((instruction & 0x80) >> 7) << 11; // imm[11]
-			imm += ((instruction & 0xF00) >> 8) << 1; // imm[4:1]
-			imm += ((instruction & 0x7E000000) >> 25) << 5; // imm[10:5]
-			imm += ((instruction & 0x80000000) >> 31) << 12;  // imm[12]
-
-			offset = signExtend_13b(imm);
-		}
-		else if(opcode == 0x6F){ //J-type
-			imm += ((instruction & 0xFF000) >> 12) << 12; //imm[19:12]
-			imm += ((instruction & 0x00100000) >> 20) << 11; //imm[11]
-			imm += ((instruction & 0x7FE00000) >> 21) << 1; //imm[10:1]
-			imm += ((instruction & 0x80000000) >> 31) << 20; //imm[20]
-
-			offset = signExtend_21b(imm);
-		}
-		else{
-			continue;
-		}
-
-		branches[numBranches] = addr + offset; //imm is the offset
-		numBranches++;
-
-		if(numBranches == MAX_BRANCHES){
-			printf("Too many branches for print_program() to handle \n");
-			return;
-		}
-	}
-
     for(addr = CURRENT_STATE.PC; addr < MEM_TEXT_END; addr += 4){
         uint32_t instruction = mem_read_32(addr);
 
-        uint32_t opcode = instruction & 0x7F;
-        uint32_t rd = (instruction >> 7) & 0x1F;
-        uint32_t funct3 = (instruction >> 12) & 0x7;
-        uint32_t rs1 = (instruction >> 15) & 0x1F;
-        uint32_t rs2 = (instruction >> 20) & 0x1F;
-        uint32_t funct7 = (instruction >> 25) & 0x7F;
-
-        uint32_t imm=0; // immediate value
-		int32_t offset; //offset for jumps
-		uint32_t branchAddress;
-
-		char branchHeader[] = "Br-";
-
-		if (opcode == 00000000) { // kind of hard coded? not sure what to do here but this is a band-aid for now
-			break;
-		}
-
-        printf("%08x: %08x ", addr, instruction);
-
-        switch (opcode) {
-            case 0x33: // R-type
-                switch (funct3) {
-                    case 0x0:
-                        if (funct7 == 0x00) printf("add ");
-                        else if (funct7 == 0x20) printf("sub ");
-                        break;
-                    case 0x1: printf("sll "); break;
-                    case 0x2: printf("slt "); break;
-                    case 0x3: printf("sltu "); break;
-                    case 0x4: printf("xor "); break;
-                    case 0x5:
-                        if (funct7 == 0x00) printf("srl ");
-                        else if (funct7 == 0x20) printf("sra ");
-                        break;
-                    case 0x6: printf("or "); break;
-                    case 0x7: printf("and "); break;
-                }
-                printf("x%d, x%d, x%d\n", rd, rs1, rs2);
-                break;
-            case 0x03: // I-type (load)
-                imm = (instruction >> 20);
-                switch (funct3) {
-                    case 0x0: printf("lb "); break;
-                    case 0x1: printf("lh "); break;
-                    case 0x2: printf("lw "); break;
-                    case 0x4: printf("lbu "); break;
-                    case 0x5: printf("lhu "); break;
-                }
-                printf("x%d, %d(x%d)\n", rd, imm, rs1);
-                break;
-            case 0x13: // I-type (addi, slti, sltiu, xori, ori, andi, slli, srli, srai)
-                imm = (instruction >> 20);
-                switch (funct3) {
-                    case 0x0: printf("addi "); break;
-                    case 0x2: printf("slti "); break;
-                    case 0x3: printf("sltiu "); break;
-                    case 0x4: printf("xori "); break;
-                    case 0x6: printf("ori "); break;
-                    case 0x7: printf("andi "); break;
-                    case 0x1: printf("slli "); break;
-                    case 0x5:
-                        if (funct7 == 0x00) printf("srli ");
-                        else if (funct7 == 0x20) printf("srai ");
-                        break;
-                }
-                printf("x%d, x%d, %d\n", rd, rs1, imm);
-                break;
-            case 0x23: // S-type
-                imm = ((instruction >> 25) << 5) | ((instruction >> 7) & 0x1F);
-                switch (funct3) {
-                    case 0x0: printf("sb "); break;
-                    case 0x1: printf("sh "); break;
-                    case 0x2: printf("sw "); break;
-                }
-                printf("x%d, %d(x%d)\n", rs2, imm, rs1);
-                break;
-			case 0x63: // B-type branching
-				imm += ((instruction & 0x80) >> 7) << 11; // imm[11]
-				imm += ((instruction & 0xF00) >> 8) << 1; // imm[4:1]
-				imm += ((instruction & 0x7E000000) >> 25) << 5; // imm[10:5]
-				imm += ((instruction & 0x80000000) >> 31) << 12;  // imm[12]
-
-				switch (funct3){
-					case 0x0: printf("beq "); break;
-					case 0x1: printf("bne "); break;
-					case 0x4: printf("blt "); break;
-					case 0x5: printf("bge "); break;
-					case 0x6: printf("bltu "); break;
-					case 0x7: printf("bgeu "); break;
-				}
-
-				offset = signExtend_13b(imm);
-				
-				//convert from unsigned to signed
-				branchAddress = addr + offset + 4;
-
-				printf("x%d, x%d, %s%x\n", rs1, rs2, branchHeader, branchAddress);
-				break;
-
-			case 0x6F: // J-type instruction (only jal)
-				imm += ((instruction & 0xFF000) >> 12) << 12; //imm[19:12]
-				imm += ((instruction & 0x00100000) >> 20) << 11; //imm[11]
-				imm += ((instruction & 0x7FE00000) >> 21) << 1; //imm[10:1]
-				imm += ((instruction & 0x80000000) >> 31) << 20; //imm[20]
-
-				offset = signExtend_21b(imm);
-				
-				//convert from unsigned to signed
-				branchAddress = addr + offset + 4;
-
-				printf("jal x%d, %s%x\n", rd, branchHeader, branchAddress);
-				break;
-
-            default:
-                printf("unknown instruction\n");
-        }
-
-		//Check to see if a branch is for this value of the PC
-		for(int i = 0; i<numBranches; i++){
-			// plus 4 to consider pc incrementing after j/b instruction ran
-			if(branches[i] + 4 == addr){ 
-				printf("%s%x\n", branchHeader, addr);
-				break; // don't need to print out multiple branches
-			}
-		}
+        print_instruction(instruction, TRUE, addr);
     }
 }
 
 /************************************************************/
-/* Print the current pipeline                                                                                    */
+/* Print the current pipeline                               */
 /************************************************************/
 void show_pipeline(){
-	/*IMPLEMENT THIS*/
+	const char allZeroInstruction[] = "No Instruction Loaded";
+
+	printf("Curent PC		%i\n", CURRENT_STATE.PC);
+	printf("IF/ID.IR		");
+	print_instruction(ID_IF.IR, FALSE, 0) == 0 ? printf(" ") : printf("%s\n", allZeroInstruction);
+	printf("IF/ID.PC		%i\n", ID_IF.PC);
+
+	printf("\n");
+
+	printf("ID/EX.IR		");
+	print_instruction(IF_EX.IR, FALSE, 0) == 0 ? printf(" ") : printf("%s\n", allZeroInstruction);
+	printf("ID/EX.A			%i\n", IF_EX.A);
+	printf("ID/EX.B			%i\n", IF_EX.B);
+	printf("ID/EX.imm		%i\n", IF_EX.imm);
+
+	printf("\n");
+
+	printf("EX/MEM.IR		"); 
+	print_instruction(EX_MEM.IR, FALSE, 0) == 0 ? printf(" ") : printf("%s\n", allZeroInstruction);
+	printf("EX/MEM.A		%i\n", EX_MEM.A);
+	printf("EX/MEM.B		%i\n", EX_MEM.B);
+	printf("EX/MEM.ALUOutput	%i\n", EX_MEM.ALUOutput);
+
+	printf("\n");
+
+	printf("MEM/WB.IR		");
+	print_instruction(MEM_WB.IR, FALSE, 0) == 0 ? printf(" ") : printf("%s\n", allZeroInstruction);
+	printf("MEM/WB.ALUOutput	%i\n", MEM_WB.ALUOutput);
+	printf("MEM/WB.LMD		%i\n", MEM_WB.LMD);
 }
 
 /***************************************************************/
