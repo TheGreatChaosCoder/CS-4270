@@ -312,7 +312,6 @@ void handle_pipeline()
 {
 	/*INSTRUCTION_COUNT should be incremented when instruction is done*/
 	/*Since we do not have branch/jump instructions, INSTRUCTION_COUNT should be incremented in WB stage */
-
 	WB();
 	MEM();
 	EX();
@@ -326,7 +325,6 @@ void handle_pipeline()
 void WB()
 {
 	INSTRUCTION_COUNT++;
-	/*IMPLEMENT THIS*/
 	const uint32_t opcode =  MEM_WB.IR & 0x7F;
 	const uint32_t rd = (MEM_WB.IR >> 7) & 0x1F;
 
@@ -564,7 +562,7 @@ else if (opcode == 0x23) { // S-type instructions
 void ID()
 {
 	IF_EX.IR = ID_IF.IR;
-    //printf("%d\n", IF_EX.IR);
+
     // Extract rs and rd from IR
     int rs = (IF_EX.IR >> 15) & 0x1F;
     int rt = (IF_EX.IR >> 20) & 0x1F;
@@ -592,13 +590,11 @@ void IF()
 	// IR <= Mem[PC]
 	ID_IF.IR = mem_read_32(CURRENT_STATE.PC);
 	ID_IF.PC = CURRENT_STATE.PC;
-	////printf("IR: %08x IR_PC: %08x\n", ID_IF.IR, ID_IF.PC);
 
 	// PC <= PC + 4
 	CURRENT_STATE.PC += 4;
 	NEXT_STATE = CURRENT_STATE;
-	////printf("PC: %08x\n", CURRENT_STATE.PC);
-}
+/}
 
 
 /************************************************************/
