@@ -474,7 +474,6 @@ else if (opcode == 0x23) { // S-type instructions
                 EX_MEM.ALUOutput = IF_EX.PC + 4;
             }
             break;
-        // ... add other B-type instructions here ...
 		case 0x1: // BNE
 			if (IF_EX.A != IF_EX.B) {
 				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
@@ -527,19 +526,19 @@ void ID()
 {
 	IF_EX.IR = ID_IF.IR;
     //printf("%d\n", IF_EX.IR);
-    // Extract rs and rt from IR
-    int rs = (IF_EX.IR >> 15) & 0x1F;
-    int rt = (IF_EX.IR >> 20) & 0x1F;
+    // Extract rs1 and rs2 from IR
+    int rs1 = (IF_EX.IR >> 15) & 0x1F;
+    int rs2 = (IF_EX.IR >> 20) & 0x1F;
 
     // Read values from register file
-    IF_EX.A = CURRENT_STATE.REGS[rs];
-    IF_EX.B = CURRENT_STATE.REGS[rt];
+    IF_EX.A = CURRENT_STATE.REGS[rs1];
+    IF_EX.B = CURRENT_STATE.REGS[rs2];
 
     // Extract opcode from IR
     int opcode = IF_EX.IR & 0x7F;
 
     // Sign-extend the lower 16 bits of IR only for instructions that use an immediate value
-    if (opcode != 0x33) {
+   if (opcode != 0x33) {
         IF_EX.imm = (IF_EX.IR >> 20);
     } else {
         IF_EX.imm = 0;
