@@ -713,13 +713,13 @@ void show_pipeline(){
 
 	printf("Curent PC		%i\n", CURRENT_STATE.PC);
 	printf("IF/ID.IR		");
-	print_instruction(ID_IF.IR, FALSE, 0) == 0 ? printf(" ") : printf("%s\n", allZeroInstruction);
+	if(print_instruction(ID_IF.IR, FALSE, 0) != 0) { printf("%s\n", allZeroInstruction); }
 	printf("IF/ID.PC		%i\n", ID_IF.PC);
 
 	printf("\n");
 
 	printf("ID/EX.IR		");
-	print_instruction(IF_EX.IR, FALSE, 0) == 0 ? printf(" ") : printf("%s\n", allZeroInstruction);
+	if(print_instruction(IF_EX.IR, FALSE, 0) != 0) { printf("%s\n", allZeroInstruction); }
 	printf("ID/EX.A			%i\n", IF_EX.A);
 	printf("ID/EX.B			%i\n", IF_EX.B);
 	printf("ID/EX.imm		%i\n", IF_EX.imm);
@@ -727,7 +727,7 @@ void show_pipeline(){
 	printf("\n");
 
 	printf("EX/MEM.IR		"); 
-	print_instruction(EX_MEM.IR, FALSE, 0) == 0 ? printf(" ") : printf("%s\n", allZeroInstruction);
+	if(print_instruction(EX_MEM.IR, FALSE, 0) != 0) { printf("%s\n", allZeroInstruction); }
 	printf("EX/MEM.A		%i\n", EX_MEM.A);
 	printf("EX/MEM.B		%i\n", EX_MEM.B);
 	printf("EX/MEM.ALUOutput	%i\n", EX_MEM.ALUOutput);
@@ -735,7 +735,7 @@ void show_pipeline(){
 	printf("\n");
 
 	printf("MEM/WB.IR		");
-	print_instruction(MEM_WB.IR, FALSE, 0) == 0 ? printf(" ") : printf("%s\n", allZeroInstruction);
+	if(print_instruction(MEM_WB.IR, FALSE, 0) != 0) { printf("%s\n", allZeroInstruction); }
 	printf("MEM/WB.ALUOutput	%i\n", MEM_WB.ALUOutput);
 	printf("MEM/WB.LMD		%i\n", MEM_WB.LMD);
 }
