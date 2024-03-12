@@ -277,7 +277,7 @@ void init_memory() {
 }
 
 /**************************************************************/
-/* load program into memory                                                                                      */
+/* load program into memory                                   */
 /**************************************************************/
 void load_program() {
 	FILE * fp;
@@ -306,7 +306,7 @@ void load_program() {
 }
 
 /************************************************************/
-/* maintain the pipeline                                                                                           */
+/* maintain the pipeline                                    */
 /************************************************************/
 void handle_pipeline()
 {
@@ -321,16 +321,37 @@ void handle_pipeline()
 }
 
 /************************************************************/
-/* writeback (WB) pipeline stage:                                                                          */
+/* writeback (WB) pipeline stage:                           */
 /************************************************************/
 void WB()
 {
 	INSTRUCTION_COUNT++;
 	/*IMPLEMENT THIS*/
+	const uint32_t opcode =  MEM_WB.IR & 0x7F;
+	const uint32_t rd = (MEM_WB.IR >> 7) & 0x1F;
+
+	switch(opcode){
+		case 0x33: //Register-Register Instruction (R-type)
+			NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+			break;
+		case 0x13: //Register-Immediate Instruction (I-type Arimetic)
+			NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+			break;
+		case 0x03: //Load-from-Memory Instruction (I-type Load)
+			NEXT_STATE.REGS[rd] = MEM_WB.LMD;
+			break;
+		default: //NOP and Store Instruction (S-type)
+			//Do nothing
+			break;
+	}
+
+	if(opcode != 0){
+		INSTRUCTION_COUNT++;
+	}
 }
 
 /************************************************************/
-/* memory access (MEM) pipeline stage:                                                          */
+/* memory access (MEM) pipeline stage:                      */
 /************************************************************/
 void MEM()
 {
@@ -339,7 +360,7 @@ void MEM()
 }
 
 /************************************************************/
-/* execution (EX) pipeline stage:                                                                          */
+/* execution (EX) pipeline stage:                           */
 /************************************************************/
 void EX()
 {
@@ -500,7 +521,7 @@ else if (opcode == 0x23) { // S-type instructions
 }
 
 /************************************************************/
-/* instruction decode (ID) pipeline stage:                                                         */
+/* instruction decode (ID) pipeline stage:                  */
 /************************************************************/
 void ID()
 {
@@ -526,7 +547,7 @@ void ID()
 }
 
 /************************************************************/
-/* instruction fetch (IF) pipeline stage:                                                              */
+/* instruction fetch (IF) pipeline stage:                   */
 /************************************************************/
 void IF()
 {
@@ -543,7 +564,7 @@ void IF()
 
 
 /************************************************************/
-/* Initialize Memory                                                                                                    */
+/* Initialize Memory                                        */
 /************************************************************/
 void initialize() {
 	init_memory();
