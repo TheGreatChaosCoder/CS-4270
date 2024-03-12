@@ -526,13 +526,13 @@ void ID()
 {
 	IF_EX.IR = ID_IF.IR;
     //printf("%d\n", IF_EX.IR);
-    // Extract rs1 and rs2 from IR
-    int rs1 = (IF_EX.IR >> 15) & 0x1F;
-    int rs2 = (IF_EX.IR >> 20) & 0x1F;
+    // Extract rs and rd from IR
+    int rs = (IF_EX.IR >> 15) & 0x1F;
+    int rt = (IF_EX.IR >> 20) & 0x1F;
 
     // Read values from register file
-    IF_EX.A = CURRENT_STATE.REGS[rs1];
-    IF_EX.B = CURRENT_STATE.REGS[rs2];
+    IF_EX.A = CURRENT_STATE.REGS[rs];
+    IF_EX.B = CURRENT_STATE.REGS[rt];
 
     // Extract opcode from IR
     int opcode = IF_EX.IR & 0x7F;
