@@ -330,23 +330,21 @@ void WB()
 	const uint32_t opcode =  MEM_WB.IR & 0x7F;
 	const uint32_t rd = (MEM_WB.IR >> 7) & 0x1F;
 
+	INSTRUCTION_COUNT++;
+
 	switch(opcode){
 		case 0x33: //Register-Register Instruction (R-type)
-			NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+			CURRENT_STATE.REGS[rd] = MEM_WB.ALUOutput;
 			break;
 		case 0x13: //Register-Immediate Instruction (I-type Arimetic)
-			NEXT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+			CURRENT_STATE.REGS[rd] = MEM_WB.ALUOutput;
 			break;
 		case 0x03: //Load-from-Memory Instruction (I-type Load)
-			NEXT_STATE.REGS[rd] = MEM_WB.LMD;
+			CURRENT_STATE.REGS[rd] = MEM_WB.LMD;
 			break;
 		default: //NOP and Store Instruction (S-type)
 			//Do nothing
 			break;
-	}
-
-	if(opcode != 0){
-		INSTRUCTION_COUNT++;
 	}
 }
 
@@ -356,7 +354,46 @@ void WB()
 void MEM()
 {
 	MEM_WB.IR = EX_MEM.IR;
-	/*IMPLEMENT THIS*/
+	MEM_WB.ALUOutput = EX_MEM.ALUOutput;
+
+	int opcode = MEM_WB.IR & 0x7F;
+	int funct3 = (MEM_WB.IR >> 12) & 0x7;
+
+	switch(opcode){
+		case 0x03: //Load-from-Memory Instruction (I-type Load)
+
+			switch(funct3){
+				case(0x0): //lb
+					MEM_WB.LMD = mem_read_32(EX_MEM.ALUOutput);
+					break;
+				case(0x1): //lh
+					MEM_WB.LMD = mem_read_32(EX_MEM.ALUOutput);
+					break;
+				case(0x2): //lw
+					MEM_WB.LMD = mem_read_32(EX_MEM.ALUOutput);
+					break;
+			}
+
+			break;
+		case 0x23: //Store Instruction (S-type)
+
+			switch(funct3){
+				case(0x0): //lb
+					mem_write_32(EX_MEM.ALUOutput, EX_MEM.B);
+					break;
+				case(0x1): //lh
+					mem_write_32(EX_MEM.ALUOutput, EX_MEM.B);
+					break;
+				case(0x2): //lw
+					mem_write_32(EX_MEM.ALUOutput, EX_MEM.B);
+					break;
+			}
+			break;
+		default: //Other instrutions that don't use memory
+			//Do nothing
+			break;
+	}
+
 }
 
 /************************************************************/
@@ -365,6 +402,8 @@ void MEM()
 void EX()
 {
     EX_MEM.IR = IF_EX.IR;
+	EX_MEM.A = IF_EX.A;
+	EX_MEM.B = IF_EX.B;
     int opcode = IF_EX.IR & 0x7F;
     int funct3 = (IF_EX.IR >> 12) & 0x7;
     int funct7 = (IF_EX.IR >> 25);
