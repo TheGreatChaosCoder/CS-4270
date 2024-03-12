@@ -139,7 +139,7 @@ void rdump() {
 	printf("-------------------------------------\n");
 	printf("[Register]\t[Value]\n");
 	printf("-------------------------------------\n");
-	for (i = 0; i < RISCV_REGS; i++){
+	for (i = 0; i < MIPS_REGS; i++){
 		printf("[R%d]\t: 0x%08x\n", i, CURRENT_STATE.REGS[i]);
 	}
 	printf("-------------------------------------\n");
@@ -243,7 +243,7 @@ void handle_command() {
 void reset() {
 	int i;
 	/*reset registers*/
-	for (i = 0; i < RISCV_REGS; i++){
+	for (i = 0; i < MIPS_REGS; i++){
 		CURRENT_STATE.REGS[i] = 0;
 	}
 	CURRENT_STATE.HI = 0;
@@ -277,7 +277,7 @@ void init_memory() {
 }
 
 /**************************************************************/
-/* load program into memory                                                                                      */
+/* load program into memory                                   */
 /**************************************************************/
 void load_program() {
 	FILE * fp;
@@ -306,13 +306,12 @@ void load_program() {
 }
 
 /************************************************************/
-/* maintain the pipeline                                                                                           */
+/* maintain the pipeline                                    */
 /************************************************************/
 void handle_pipeline()
 {
 	/*INSTRUCTION_COUNT should be incremented when instruction is done*/
 	/*Since we do not have branch/jump instructions, INSTRUCTION_COUNT should be incremented in WB stage */
-
 	WB();
 	MEM();
 	EX();
@@ -321,48 +320,285 @@ void handle_pipeline()
 }
 
 /************************************************************/
-/* writeback (WB) pipeline stage:                                                                          */
+/* writeback (WB) pipeline stage:                           */
 /************************************************************/
 void WB()
 {
-	/*IMPLEMENT THIS*/
+	INSTRUCTION_COUNT++;
+	const uint32_t opcode =  MEM_WB.IR & 0x7F;
+	const uint32_t rd = (MEM_WB.IR >> 7) & 0x1F;
+
+	INSTRUCTION_COUNT++;
+
+	switch(opcode){
+		case 0x33: //Register-Register Instruction (R-type)
+			CURRENT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+			break;
+		case 0x13: //Register-Immediate Instruction (I-type Arimetic)
+			CURRENT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+			break;
+		case 0x03: //Load-from-Memory Instruction (I-type Load)
+			CURRENT_STATE.REGS[rd] = MEM_WB.LMD;
+			break;
+		default: //NOP and Store Instruction (S-type)
+			//Do nothing
+			break;
+	}
 }
 
 /************************************************************/
-/* memory access (MEM) pipeline stage:                                                          */
+/* memory access (MEM) pipeline stage:                      */
 /************************************************************/
 void MEM()
 {
-	/*IMPLEMENT THIS*/
+	MEM_WB.IR = EX_MEM.IR;
+	MEM_WB.ALUOutput = EX_MEM.ALUOutput;
+
+	int opcode = MEM_WB.IR & 0x7F;
+	int funct3 = (MEM_WB.IR >> 12) & 0x7;
+
+	switch(opcode){
+		case 0x03: //Load-from-Memory Instruction (I-type Load)
+
+			switch(funct3){
+				case(0x0): //lb
+					MEM_WB.LMD = mem_read_32(EX_MEM.ALUOutput);
+					break;
+				case(0x1): //lh
+					MEM_WB.LMD = mem_read_32(EX_MEM.ALUOutput);
+					break;
+				case(0x2): //lw
+					MEM_WB.LMD = mem_read_32(EX_MEM.ALUOutput);
+					break;
+			}
+
+			break;
+		case 0x23: //Store Instruction (S-type)
+
+			switch(funct3){
+				case(0x0): //lb
+					mem_write_32(EX_MEM.ALUOutput, EX_MEM.B);
+					break;
+				case(0x1): //lh
+					mem_write_32(EX_MEM.ALUOutput, EX_MEM.B);
+					break;
+				case(0x2): //lw
+					mem_write_32(EX_MEM.ALUOutput, EX_MEM.B);
+					break;
+			}
+			break;
+		default: //Other instrutions that don't use memory
+			//Do nothing
+			break;
+	}
+
 }
 
 /************************************************************/
-/* execution (EX) pipeline stage:                                                                          */
+/* execution (EX) pipeline stage:                           */
 /************************************************************/
 void EX()
 {
-	/*IMPLEMENT THIS*/
+    EX_MEM.IR = IF_EX.IR;
+	EX_MEM.A = IF_EX.A;
+	EX_MEM.B = IF_EX.B;
+    int opcode = IF_EX.IR & 0x7F;
+    int funct3 = (IF_EX.IR >> 12) & 0x7;
+    int funct7 = (IF_EX.IR >> 25);
+
+    if (opcode == 0x33) { // R-type instructions
+    switch (funct3) {
+        case 0x0:
+            if (funct7 == 0x00) {
+                // add
+                EX_MEM.ALUOutput = IF_EX.A + IF_EX.B;
+            } else if (funct7 == 0x20) {
+                // sub
+                EX_MEM.ALUOutput = IF_EX.A - IF_EX.B;
+            }
+            break;
+        case 0x1:
+            // sll
+            EX_MEM.ALUOutput = IF_EX.A << IF_EX.B;
+            break;
+        case 0x4:
+            // xor
+            EX_MEM.ALUOutput = IF_EX.A ^ IF_EX.B;
+            break;
+        case 0x6:
+            if (funct7 == 0x00) {
+                // srl
+                EX_MEM.ALUOutput = (unsigned int)IF_EX.A >> IF_EX.B;
+            } else if (funct7 == 0x20) {
+                // sra
+                EX_MEM.ALUOutput = IF_EX.A >> IF_EX.B;
+            }
+            break;
+        case 0x7:
+            // and
+            EX_MEM.ALUOutput = IF_EX.A & IF_EX.B;
+            break;
+        case 0x5:
+            // or
+            EX_MEM.ALUOutput = IF_EX.A | IF_EX.B;
+            break;
+        case 0x2:
+            // slt
+            EX_MEM.ALUOutput = (IF_EX.A < IF_EX.B) ? 1 : 0;
+            break;
+        case 0x3:
+            // sltu
+            EX_MEM.ALUOutput = ((unsigned int)IF_EX.A < (unsigned int)IF_EX.B) ? 1 : 0;
+            break;
+    }
+} 
+else if (opcode == 0x03 || opcode == 0x13 || opcode == 0x1B || opcode == 0x67) { // I-type instructions
+    switch (funct3) {
+        case 0x0:
+            if (opcode == 0x03) {
+                // lb
+                EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+            } else if (opcode == 0x13) {
+                // addi
+                EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+            }
+            break;
+        case 0x4: // XORI
+            EX_MEM.ALUOutput = IF_EX.A ^ IF_EX.imm;
+            break;
+        case 0x6: // ORI
+            EX_MEM.ALUOutput = IF_EX.A | IF_EX.imm;
+            break;
+        case 0x7: // ANDI
+            EX_MEM.ALUOutput = IF_EX.A & IF_EX.imm;
+            break;
+        case 0x1: // SLLI
+            EX_MEM.ALUOutput = IF_EX.A << IF_EX.imm;
+            break;
+        case 0x5: // SRLI and SRAI
+            if (IF_EX.imm & 0x400) { // SRAI
+                EX_MEM.ALUOutput = ((int32_t)IF_EX.A) >> IF_EX.imm;
+            } else { // SRLI
+                EX_MEM.ALUOutput = IF_EX.A >> IF_EX.imm;
+            }
+            break;
+        case 0x2: // SLTI
+            EX_MEM.ALUOutput = ((int32_t)IF_EX.A < (int32_t)IF_EX.imm) ? 1 : 0;
+            break;
+        case 0x3: // SLTIU
+            EX_MEM.ALUOutput = (IF_EX.A < IF_EX.imm) ? 1 : 0;
+            break;
+    }
+}
+else if (opcode == 0x23) { // S-type instructions
+    switch (funct3) {
+        case 0x0: // SB
+            EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+            break;
+		case 0x1: // SH
+			EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+			break;
+		case 0x2: // SW
+			EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+			break;
+    }
+} else if (opcode == 0x63) { // B-type instructions
+    switch (funct3) {
+        case 0x0: // BEQ
+            if (IF_EX.A == IF_EX.B) {
+                EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+            } else {
+                EX_MEM.ALUOutput = IF_EX.PC + 4;
+            }
+            break;
+		case 0x1: // BNE
+			if (IF_EX.A != IF_EX.B) {
+				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+			} else {
+				EX_MEM.ALUOutput = IF_EX.PC + 4;
+			}
+			break;
+		case 0x4: // BLT
+			if ((int32_t)IF_EX.A < (int32_t)IF_EX.B) {
+				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+			} else {
+				EX_MEM.ALUOutput = IF_EX.PC + 4;
+			}
+			break;
+		case 0x5: // BGE
+			if ((int32_t)IF_EX.A >= (int32_t)IF_EX.B) {
+				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+			} else {
+				EX_MEM.ALUOutput = IF_EX.PC + 4;
+			}
+			break;
+		case 0x6: // BLTU
+			if (IF_EX.A < IF_EX.B) {
+				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+			} else {
+				EX_MEM.ALUOutput = IF_EX.PC + 4;
+			}
+			break;
+		case 0x7: // BGEU
+			if (IF_EX.A >= IF_EX.B) {
+				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+			} else {
+				EX_MEM.ALUOutput = IF_EX.PC + 4;
+			}
+			break;
+    }
+} else if (opcode == 0x37 || opcode == 0x17) { // U-type instructions
+    // LUI or AUIPC
+    EX_MEM.ALUOutput = IF_EX.imm;
+} else if (opcode == 0x6F) { // J-type instructions
+    // JAL
+    EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+}
 }
 
 /************************************************************/
-/* instruction decode (ID) pipeline stage:                                                         */
+/* instruction decode (ID) pipeline stage:                  */
 /************************************************************/
 void ID()
 {
-	/*IMPLEMENT THIS*/
+	IF_EX.IR = ID_IF.IR;
+
+    // Extract rs and rd from IR
+    int rs = (IF_EX.IR >> 15) & 0x1F;
+    int rt = (IF_EX.IR >> 20) & 0x1F;
+
+    // Read values from register file
+    IF_EX.A = CURRENT_STATE.REGS[rs];
+    IF_EX.B = CURRENT_STATE.REGS[rt];
+
+    // Extract opcode from IR
+    int opcode = IF_EX.IR & 0x7F;
+
+    // Sign-extend the lower 16 bits of IR only for instructions that use an immediate value
+   if (opcode != 0x33) {
+        IF_EX.imm = (IF_EX.IR >> 20);
+    } else {
+        IF_EX.imm = 0;
+    }
 }
 
 /************************************************************/
-/* instruction fetch (IF) pipeline stage:                                                              */
+/* instruction fetch (IF) pipeline stage:                   */
 /************************************************************/
 void IF()
 {
-	/*IMPLEMENT THIS*/
+	// IR <= Mem[PC]
+	ID_IF.IR = mem_read_32(CURRENT_STATE.PC);
+	ID_IF.PC = CURRENT_STATE.PC;
+
+	// PC <= PC + 4
+	CURRENT_STATE.PC += 4;
+	NEXT_STATE = CURRENT_STATE;
 }
 
 
 /************************************************************/
-/* Initialize Memory                                                                                                    */
+/* Initialize Memory                                        */
 /************************************************************/
 void initialize() {
 	init_memory();
@@ -374,15 +610,134 @@ void initialize() {
 /************************************************************/
 /* Print the program loaded into memory (in RISCV assembly format)    */
 /************************************************************/
+
+//Returns 0 if not an all-zero instruction, 1 otherwise
+uint8_t print_instruction(const uint32_t instruction, const uint8_t printAddress, const uint32_t addr){
+	uint32_t opcode = instruction & 0x7F;
+    uint32_t rd = (instruction >> 7) & 0x1F;
+    uint32_t funct3 = (instruction >> 12) & 0x7;
+    uint32_t rs1 = (instruction >> 15) & 0x1F;
+    uint32_t rs2 = (instruction >> 20) & 0x1F;
+    uint32_t funct7 = (instruction >> 25) & 0x7F;
+
+	if (opcode == 00000000) { // stops instructions with all zero bits from being printed
+		return 1;
+	}
+
+	if(printAddress){
+    	printf("%08x: %08x ", addr, instruction);
+	}
+
+	uint32_t imm = 0;
+
+    switch (opcode) {
+        case 0x33: // R-type
+            switch (funct3) {
+                case 0x0:
+                    if (funct7 == 0x00) printf("add ");
+                    else if (funct7 == 0x20) printf("sub ");
+                    break;
+                case 0x1: printf("sll "); break;
+                case 0x2: printf("slt "); break;
+                case 0x3: printf("sltu "); break;
+                case 0x4: printf("xor "); break;
+                case 0x5:
+                    if (funct7 == 0x00) printf("srl ");
+                    else if (funct7 == 0x20) printf("sra ");
+                    break;
+                case 0x6: printf("or "); break;
+                case 0x7: printf("and "); break;
+                }
+                printf("x%d, x%d, x%d\n", rd, rs1, rs2);
+                break;
+        case 0x03: // I-type (load)
+            imm = (instruction >> 20);
+            switch (funct3) {
+                case 0x0: printf("lb "); break;
+                case 0x1: printf("lh "); break;
+                case 0x2: printf("lw "); break;
+                case 0x4: printf("lbu "); break;
+                case 0x5: printf("lhu "); break;
+            }
+            printf("x%d, %d(x%d)\n", rd, imm, rs1);
+            break;
+        case 0x13: // I-type (addi, slti, sltiu, xori, ori, andi, slli, srli, srai)
+            imm = (instruction >> 20);
+            switch (funct3) {
+                case 0x0: printf("addi "); break;
+                case 0x2: printf("slti "); break;
+                case 0x3: printf("sltiu "); break;
+                case 0x4: printf("xori "); break;
+                case 0x6: printf("ori "); break;
+                case 0x7: printf("andi "); break;
+                case 0x1: printf("slli "); break;
+                case 0x5:
+                    if (funct7 == 0x00) printf("srli ");
+                    else if (funct7 == 0x20) printf("srai ");                        
+					break;
+                }
+            printf("x%d, x%d, %d\n", rd, rs1, imm);
+            break;
+        case 0x23: // S-type
+            imm = ((instruction >> 25) << 5) | ((instruction >> 7) & 0x1F);
+            switch (funct3) {
+                case 0x0: printf("sb "); break;
+                case 0x1: printf("sh "); break;
+                case 0x2: printf("sw "); break;
+			}
+            printf("x%d, %d(x%d)\n", rs2, imm, rs1);
+            break;
+
+        default:
+            printf("unknown instruction\n");
+    }
+	return 0;
+}
+
 void print_program(){
-	/*IMPLEMENT THIS*/
+	/* execute one instruction at a time. Use/update CURRENT_STATE and and NEXT_STATE, as necessary.*/
+	uint32_t addr;
+
+    for(addr = CURRENT_STATE.PC; addr < MEM_TEXT_END; addr += 4){
+        uint32_t instruction = mem_read_32(addr);
+
+        print_instruction(instruction, TRUE, addr);
+    }
 }
 
 /************************************************************/
-/* Print the current pipeline                                                                                    */
+/* Print the current pipeline                               */
 /************************************************************/
 void show_pipeline(){
-	/*IMPLEMENT THIS*/
+	const char allZeroInstruction[] = "No Instruction Loaded";
+
+	printf("Curent PC		%i\n", CURRENT_STATE.PC);
+	printf("IF/ID.IR		");
+	if(print_instruction(ID_IF.IR, FALSE, 0) != 0) { printf("%s\n", allZeroInstruction); }
+	printf("IF/ID.PC		%i\n", ID_IF.PC);
+
+	printf("\n");
+
+	printf("ID/EX.IR		");
+	if(print_instruction(IF_EX.IR, FALSE, 0) != 0) { printf("%s\n", allZeroInstruction); }
+	printf("ID/EX.A			%i\n", IF_EX.A);
+	printf("ID/EX.B			%i\n", IF_EX.B);
+	printf("ID/EX.imm		%i\n", IF_EX.imm);
+
+	printf("\n");
+
+	printf("EX/MEM.IR		"); 
+	if(print_instruction(EX_MEM.IR, FALSE, 0) != 0) { printf("%s\n", allZeroInstruction); }
+	printf("EX/MEM.A		%i\n", EX_MEM.A);
+	printf("EX/MEM.B		%i\n", EX_MEM.B);
+	printf("EX/MEM.ALUOutput	%i\n", EX_MEM.ALUOutput);
+
+	printf("\n");
+
+	printf("MEM/WB.IR		");
+	if(print_instruction(MEM_WB.IR, FALSE, 0) != 0) { printf("%s\n", allZeroInstruction); }
+	printf("MEM/WB.ALUOutput	%i\n", MEM_WB.ALUOutput);
+	printf("MEM/WB.LMD		%i\n", MEM_WB.LMD);
 }
 
 /***************************************************************/
