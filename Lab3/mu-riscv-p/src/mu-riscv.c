@@ -505,7 +505,7 @@ else if (opcode == 0x23) { // S-type instructions
 void ID()
 {
 	IF_EX.IR = ID_IF.IR;
-    printf("%d\n", IF_EX.IR);
+    //printf("%d\n", IF_EX.IR);
     // Extract rs and rt from IR
     int rs = (IF_EX.IR >> 15) & 0x1F;
     int rt = (IF_EX.IR >> 20) & 0x1F;
