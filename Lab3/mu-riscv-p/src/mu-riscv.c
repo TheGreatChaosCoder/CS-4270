@@ -594,7 +594,7 @@ void IF()
 	// PC <= PC + 4
 	CURRENT_STATE.PC += 4;
 	NEXT_STATE = CURRENT_STATE;
-/}
+}
 
 
 /************************************************************/
