@@ -397,7 +397,8 @@ void MEM()
 			}
 			break;
 		default: //Other instrutions that don't use memory
-			//Do nothing
+			//This makes forwarding easier, trust
+			MEM_WB.LMD = EX_MEM.ALUOutput;
 			break;
 	}
 
@@ -416,153 +417,223 @@ void EX()
     int funct7 = (IF_EX.IR >> 25);
 
     if (opcode == 0x33) { // R-type instructions
-    switch (funct3) {
-        case 0x0:
-            if (funct7 == 0x00) {
-                // add
-                EX_MEM.ALUOutput = IF_EX.A + IF_EX.B;
-            } else if (funct7 == 0x20) {
-                // sub
-                EX_MEM.ALUOutput = IF_EX.A - IF_EX.B;
-            }
-            break;
-        case 0x1:
-            // sll
-            EX_MEM.ALUOutput = IF_EX.A << IF_EX.B;
-            break;
-        case 0x4:
-            // xor
-            EX_MEM.ALUOutput = IF_EX.A ^ IF_EX.B;
-            break;
-        case 0x6:
-            if (funct7 == 0x00) {
-                // srl
-                EX_MEM.ALUOutput = (unsigned int)IF_EX.A >> IF_EX.B;
-            } else if (funct7 == 0x20) {
-                // sra
-                EX_MEM.ALUOutput = IF_EX.A >> IF_EX.B;
-            }
-            break;
-        case 0x7:
-            // and
-            EX_MEM.ALUOutput = IF_EX.A & IF_EX.B;
-            break;
-        case 0x5:
-            // or
-            EX_MEM.ALUOutput = IF_EX.A | IF_EX.B;
-            break;
-        case 0x2:
-            // slt
-            EX_MEM.ALUOutput = (IF_EX.A < IF_EX.B) ? 1 : 0;
-            break;
-        case 0x3:
-            // sltu
-            EX_MEM.ALUOutput = ((unsigned int)IF_EX.A < (unsigned int)IF_EX.B) ? 1 : 0;
-            break;
-    }
-} 
-else if (opcode == 0x03 || opcode == 0x13 || opcode == 0x1B || opcode == 0x67) { // I-type instructions
-    switch (funct3) {
-        case 0x0:
-            if (opcode == 0x03) {
-                // lb
-                EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
-            } else if (opcode == 0x13) {
-                // addi
-                EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
-            }
-            break;
-        case 0x4: // XORI
-            EX_MEM.ALUOutput = IF_EX.A ^ IF_EX.imm;
-            break;
-        case 0x6: // ORI
-            EX_MEM.ALUOutput = IF_EX.A | IF_EX.imm;
-            break;
-        case 0x7: // ANDI
-            EX_MEM.ALUOutput = IF_EX.A & IF_EX.imm;
-            break;
-        case 0x1: // SLLI
-            EX_MEM.ALUOutput = IF_EX.A << IF_EX.imm;
-            break;
-        case 0x5: // SRLI and SRAI
-            if (IF_EX.imm & 0x400) { // SRAI
-                EX_MEM.ALUOutput = ((int32_t)IF_EX.A) >> IF_EX.imm;
-            } else { // SRLI
-                EX_MEM.ALUOutput = IF_EX.A >> IF_EX.imm;
-            }
-            break;
-        case 0x2: // SLTI
-            EX_MEM.ALUOutput = ((int32_t)IF_EX.A < (int32_t)IF_EX.imm) ? 1 : 0;
-            break;
-        case 0x3: // SLTIU
-            EX_MEM.ALUOutput = (IF_EX.A < IF_EX.imm) ? 1 : 0;
-            break;
-    }
+		switch (funct3) {
+			case 0x0:
+				if (funct7 == 0x00) {
+					// add
+					EX_MEM.ALUOutput = IF_EX.A + IF_EX.B;
+				} else if (funct7 == 0x20) {
+					// sub
+					EX_MEM.ALUOutput = IF_EX.A - IF_EX.B;
+				}
+				break;
+			case 0x1:
+				// sll
+				EX_MEM.ALUOutput = IF_EX.A << IF_EX.B;
+				break;
+			case 0x4:
+				// xor
+				EX_MEM.ALUOutput = IF_EX.A ^ IF_EX.B;
+				break;
+			case 0x6:
+				if (funct7 == 0x00) {
+					// srl
+					EX_MEM.ALUOutput = (unsigned int)IF_EX.A >> IF_EX.B;
+				} else if (funct7 == 0x20) {
+					// sra
+					EX_MEM.ALUOutput = IF_EX.A >> IF_EX.B;
+				}
+				break;
+			case 0x7:
+				// and
+				EX_MEM.ALUOutput = IF_EX.A & IF_EX.B;
+				break;
+			case 0x5:
+				// or
+				EX_MEM.ALUOutput = IF_EX.A | IF_EX.B;
+				break;
+			case 0x2:
+				// slt
+				EX_MEM.ALUOutput = (IF_EX.A < IF_EX.B) ? 1 : 0;
+				break;
+			case 0x3:
+				// sltu
+				EX_MEM.ALUOutput = ((unsigned int)IF_EX.A < (unsigned int)IF_EX.B) ? 1 : 0;
+				break;
+		}
+	} 
+	else if (opcode == 0x03 || opcode == 0x13 || opcode == 0x1B || opcode == 0x67) { // I-type instructions
+		switch (funct3) {
+			case 0x0:
+				if (opcode == 0x03) {
+					// lb
+					EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+				} else if (opcode == 0x13) {
+					// addi
+					EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+				}
+				break;
+			case 0x4: // XORI
+				EX_MEM.ALUOutput = IF_EX.A ^ IF_EX.imm;
+				break;
+			case 0x6: // ORI
+				EX_MEM.ALUOutput = IF_EX.A | IF_EX.imm;
+				break;
+			case 0x7: // ANDI
+				EX_MEM.ALUOutput = IF_EX.A & IF_EX.imm;
+				break;
+			case 0x1: // SLLI
+				EX_MEM.ALUOutput = IF_EX.A << IF_EX.imm;
+				break;
+			case 0x5: // SRLI and SRAI
+				if (IF_EX.imm & 0x400) { // SRAI
+					EX_MEM.ALUOutput = ((int32_t)IF_EX.A) >> IF_EX.imm;
+				} else { // SRLI
+					EX_MEM.ALUOutput = IF_EX.A >> IF_EX.imm;
+				}
+				break;
+			case 0x2: // SLTI
+				EX_MEM.ALUOutput = ((int32_t)IF_EX.A < (int32_t)IF_EX.imm) ? 1 : 0;
+				break;
+			case 0x3: // SLTIU
+				EX_MEM.ALUOutput = (IF_EX.A < IF_EX.imm) ? 1 : 0;
+				break;
+		}
+	}
+	else if (opcode == 0x23) { // S-type instructions
+		switch (funct3) {
+			case 0x0: // SB
+				EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+				break;
+			case 0x1: // SH
+				EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+				break;
+			case 0x2: // SW
+				EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
+				break;
+		}
+	} 
+	else if (opcode == 0x63) { // B-type instructions
+		switch (funct3) {
+			case 0x0: // BEQ
+				if (IF_EX.A == IF_EX.B) {
+					EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+				} else {
+					EX_MEM.ALUOutput = IF_EX.PC + 4;
+				}
+				break;
+			case 0x1: // BNE
+				if (IF_EX.A != IF_EX.B) {
+					EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+				} else {
+					EX_MEM.ALUOutput = IF_EX.PC + 4;
+				}
+				break;
+			case 0x4: // BLT
+				if ((int32_t)IF_EX.A < (int32_t)IF_EX.B) {
+					EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+				} else {
+					EX_MEM.ALUOutput = IF_EX.PC + 4;
+				}
+				break;
+			case 0x5: // BGE
+				if ((int32_t)IF_EX.A >= (int32_t)IF_EX.B) {
+					EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+				} else {
+					EX_MEM.ALUOutput = IF_EX.PC + 4;
+				}
+				break;
+			case 0x6: // BLTU
+				if (IF_EX.A < IF_EX.B) {
+					EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+				} else {
+					EX_MEM.ALUOutput = IF_EX.PC + 4;
+				}
+				break;
+			case 0x7: // BGEU
+				if (IF_EX.A >= IF_EX.B) {
+					EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+				} else {
+					EX_MEM.ALUOutput = IF_EX.PC + 4;
+				}
+				break;
+		}
+	} else if (opcode == 0x37 || opcode == 0x17) { // U-type instructions
+		// LUI or AUIPC
+		EX_MEM.ALUOutput = IF_EX.imm;
+	} else if (opcode == 0x6F) { // J-type instructions
+		// JAL
+		EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+	}
 }
-else if (opcode == 0x23) { // S-type instructions
-    switch (funct3) {
-        case 0x0: // SB
-            EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
-            break;
-		case 0x1: // SH
-			EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
-			break;
-		case 0x2: // SW
-			EX_MEM.ALUOutput = IF_EX.A + IF_EX.imm;
-			break;
-    }
-} else if (opcode == 0x63) { // B-type instructions
-    switch (funct3) {
-        case 0x0: // BEQ
-            if (IF_EX.A == IF_EX.B) {
-                EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
-            } else {
-                EX_MEM.ALUOutput = IF_EX.PC + 4;
-            }
-            break;
-		case 0x1: // BNE
-			if (IF_EX.A != IF_EX.B) {
-				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
-			} else {
-				EX_MEM.ALUOutput = IF_EX.PC + 4;
-			}
-			break;
-		case 0x4: // BLT
-			if ((int32_t)IF_EX.A < (int32_t)IF_EX.B) {
-				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
-			} else {
-				EX_MEM.ALUOutput = IF_EX.PC + 4;
-			}
-			break;
-		case 0x5: // BGE
-			if ((int32_t)IF_EX.A >= (int32_t)IF_EX.B) {
-				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
-			} else {
-				EX_MEM.ALUOutput = IF_EX.PC + 4;
-			}
-			break;
-		case 0x6: // BLTU
-			if (IF_EX.A < IF_EX.B) {
-				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
-			} else {
-				EX_MEM.ALUOutput = IF_EX.PC + 4;
-			}
-			break;
-		case 0x7: // BGEU
-			if (IF_EX.A >= IF_EX.B) {
-				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
-			} else {
-				EX_MEM.ALUOutput = IF_EX.PC + 4;
-			}
-			break;
-    }
-} else if (opcode == 0x37 || opcode == 0x17) { // U-type instructions
-    // LUI or AUIPC
-    EX_MEM.ALUOutput = IF_EX.imm;
-} else if (opcode == 0x6F) { // J-type instructions
-    // JAL
-    EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+
+/************************************************************/
+/* Forwarding function for ID stage:                        */
+/************************************************************/
+inline uint8_t forwardingA(const uint32_t rs)
+{
+	// Used for forwarding
+	uint8_t forwardA = 0x0;
+	const uint8_t exBitMask = 0x2;
+	const uint8_t memBitMask = 0x1;
+
+	// Getting rd from EX and MEM
+	const uint32_t ex_rd = (EX_MEM.IR >> 7) & 0x1F;
+	const uint32_t mem_rd = (MEM_WB.IR >> 7) & 0x1F;
+
+	// Forwarding from EX stage
+	if(ex_rd != 0 && ex_rd == rs){
+		forwardA += 0x2;
+	}
+
+	// Forwarding from MEM stage
+	if(mem_rd != 0 && mem_rd == rs){
+		forwardA += 0x1;
+	}
+
+	// Checking for Forwarding, checking EX first
+	if(forwardA & exBitMask){
+		IF_EX.A = EX_MEM.ALUOutput;
+	}
+	else if(forwardA & memBitMask){
+		IF_EX.A = MEM_WB.LMD;
+	}
+
+	//return if forwarding happened or not
+	return forwardA > 0;
 }
+
+inline uint8_t forwardingB(const uint32_t rt)
+{
+	// Used for forwarding
+	uint8_t forwardB = 0x0;
+	const uint8_t exBitMask = 0x2;
+	const uint8_t memBitMask = 0x1;
+
+	// Getting rd from EX and MEM
+	const uint32_t ex_rd = (EX_MEM.IR >> 7) & 0x1F;
+	const uint32_t mem_rd = (MEM_WB.IR >> 7) & 0x1F;
+
+	// Forwarding from EX stage
+	if(ex_rd != 0 && ex_rd == rt){
+		forwardB += 0x2;
+	}
+
+	// Forwarding from MEM stage
+	if(mem_rd != 0 && mem_rd == rt){
+		forwardB += 0x1;
+	}
+
+	// Checking for Forwarding, checking EX first
+	if(forwardB & exBitMask){
+		IF_EX.B = EX_MEM.ALUOutput;
+	}
+	else if(forwardB & memBitMask){
+		IF_EX.B = MEM_WB.LMD;
+	}
+
+	//return if forwarding happened or not
+	return forwardB > 0;
 }
 
 /************************************************************/
@@ -576,9 +647,20 @@ void ID()
     int rs = (IF_EX.IR >> 15) & 0x1F;
     int rt = (IF_EX.IR >> 20) & 0x1F;
 
-    // Read values from register file
-    IF_EX.A = CURRENT_STATE.REGS[rs];
-    IF_EX.B = CURRENT_STATE.REGS[rt];
+	int forward = TRUE;
+
+	if(forward){
+		if(!forwardingA(rs)){
+			IF_EX.A = CURRENT_STATE.REGS[rs];
+		}
+		if(!forwardingB(rt)){
+			IF_EX.B = CURRENT_STATE.REGS[rt];
+		}
+	}
+	else{
+		IF_EX.A = CURRENT_STATE.REGS[rs];
+		IF_EX.B = CURRENT_STATE.REGS[rt];
+	}
 
     // Extract opcode from IR
     int opcode = IF_EX.IR & 0x7F;
