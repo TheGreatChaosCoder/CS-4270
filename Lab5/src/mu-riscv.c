@@ -676,6 +676,7 @@ void EX()
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
 			CURRENT_STATE.PC = EX_MEM.ALUOutput;
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x1: // BNE
 			if (IF_EX.A != IF_EX.B)
@@ -686,6 +687,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x4: // BLT
