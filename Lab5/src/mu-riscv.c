@@ -452,6 +452,9 @@ void WB()
 	case 0x03: // Load-from-Memory Instruction (I-type Load)
 		CURRENT_STATE.REGS[rd] = MEM_WB.LMD;
 		break;
+	case 0x67: // I-Type Jump and Link Register (JALR)
+		CURRENT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+		break;
 	default: // NOP and Store Instruction (S-type)
 		// Do nothing
 		break;
@@ -666,60 +669,72 @@ void EX()
 		case 0x0: // BEQ
 			if (IF_EX.A == IF_EX.B)
 			{
+				EX_MEM.PC = IF_EX.PC + IF_EX.imm;
 				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
 			}
 			else
 			{
+				EX_MEM.PC = IF_EX.PC + 4;
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
 			break;
 		case 0x1: // BNE
 			if (IF_EX.A != IF_EX.B)
 			{
+				EX_MEM.PC = IF_EX.PC + IF_EX.imm;
 				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
 			}
 			else
 			{
+				EX_MEM.PC = IF_EX.PC + 4;
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
 			break;
 		case 0x4: // BLT
 			if ((int32_t)IF_EX.A < (int32_t)IF_EX.B)
 			{
+				EX_MEM.PC = IF_EX.PC + IF_EX.imm;
 				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
 			}
 			else
 			{
+				EX_MEM.PC = IF_EX.PC + 4;
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
 			break;
 		case 0x5: // BGE
 			if ((int32_t)IF_EX.A >= (int32_t)IF_EX.B)
 			{
+				EX_MEM.PC = IF_EX.PC + IF_EX.imm;
 				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
 			}
 			else
 			{
+				EX_MEM.PC = IF_EX.PC + 4;
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
 			break;
 		case 0x6: // BLTU
 			if (IF_EX.A < IF_EX.B)
 			{
+				EX_MEM.PC = IF_EX.PC + IF_EX.imm;
 				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
 			}
 			else
 			{
+				EX_MEM.PC = IF_EX.PC + 4;
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
 			break;
 		case 0x7: // BGEU
 			if (IF_EX.A >= IF_EX.B)
 			{
+				EX_MEM.PC = IF_EX.PC + IF_EX.imm;
 				EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
 			}
 			else
 			{
+				EX_MEM.PC = IF_EX.PC + 4;
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
 			break;
@@ -733,7 +748,20 @@ void EX()
 	else if (opcode == 0x6F)
 	{ // J-type instructions
 		// JAL
-		EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+		EX_MEM.RegWrite = TRUE;
+		EX_MEM.RegisterRd = (IF_EX.IR >> 7) & 0x1F;
+
+		EX_MEM.PC = IF_EX.PC + IF_EX.imm;
+		EX_MEM.ALUOutput = IF_EX.PC + 4;
+	}
+	else if(opcode == 0x67)
+	{ // I-type jump
+		EX_MEM.RegWrite = TRUE;
+		EX_MEM.RegisterRd = (IF_EX.IR >> 7) & 0x1F;
+
+		// JALR
+		EX_MEM.PC = IF_EX.A + IF_EX.imm;
+		EX_MEM.ALUOutput = IF_EX.PC + 4;
 	}
 }
 
@@ -876,6 +904,12 @@ void ID()
 		IF_EX.imm = 0;
 	}
 
+	if(opcode == 0x63 || opcode == 0x6F)
+	{
+		printf("\nBRANCH DETECTED\n");
+		BRANCH_DETECTED = TRUE;
+	}
+
 	// Detect data hazards and stall the pipeline if necessary
 	if ((EX_MEM.RegWrite && (EX_MEM.RegisterRd != 0) && (EX_MEM.RegisterRd == rs || EX_MEM.RegisterRd == rt)) ||
 		(MEM_WB.RegWrite && (MEM_WB.RegisterRd != 0) && (MEM_WB.RegisterRd == rs || MEM_WB.RegisterRd == rt)))
@@ -912,7 +946,19 @@ void IF()
 	ID_IF.IR = mem_read_32(CURRENT_STATE.PC);
 	ID_IF.PC = CURRENT_STATE.PC;
 
-	if (!STALLING)
+	if(BRANCH_DETECTED)
+	{
+		ID_IF.IR = 00000000;
+		ID_IF.A = 0;
+		ID_IF.B = 0;
+		ID_IF.ALUOutput = 0;
+		ID_IF.LMD = 0;
+		ID_IF.RegWrite = FALSE;
+		ID_IF.RegisterRd = 0;
+
+		BRANCH_DETECTED = FALSE;
+	}
+	else if (!STALLING)
 	{
 		CURRENT_STATE.PC += 4;
 	}
