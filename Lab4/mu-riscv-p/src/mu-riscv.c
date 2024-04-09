@@ -786,7 +786,7 @@ inline uint8_t forwardingB(const uint32_t rt)
 void ID()
 {
 	// If the pipeline is currently stalled, do nothing
-	if (STALLING)
+	if (STALLING) 
 	{
 		IF_EX.IR = 00000000;
 		IF_EX.A = 0;
@@ -809,15 +809,20 @@ void ID()
 	int rs = (IF_EX.IR >> 15) & 0x1F;
 	int rt = (IF_EX.IR >> 20) & 0x1F;
 
+	// Forward here
+	// Putting ENABLE_FORWARDING first ensures that the function isn't done if forwarding is disabled
+	uint8_t forwardA = ENABLE_FORWARDING && forwardingA(rs);
+	uint8_t forwardB = ENABLE_FORWARDING && forwardingB(rt);
+
 	// Check for data hazards
 	if (ENABLE_FORWARDING)
 	{
-		// Perform data forwarding
-		if (!forwardingA(rs))
+		// Check to see if forwarding has been done
+		if (!forwardA)
 		{
 			IF_EX.A = CURRENT_STATE.REGS[rs];
 		}
-		if (!forwardingB(rt))
+		if (!forwardB)
 		{
 			IF_EX.B = CURRENT_STATE.REGS[rt];
 		}
@@ -843,8 +848,8 @@ void ID()
 	}
 
 	// Detect data hazards and stall the pipeline if necessary
-	if ((EX_MEM.RegWrite && (EX_MEM.RegisterRd != 0) && (EX_MEM.RegisterRd == rs || EX_MEM.RegisterRd == rt)) ||
-		(MEM_WB.RegWrite && (MEM_WB.RegisterRd != 0) && (MEM_WB.RegisterRd == rs || MEM_WB.RegisterRd == rt)))
+	if ((EX_MEM.RegWrite && (EX_MEM.RegisterRd != 0) && ( (EX_MEM.RegisterRd == rs && !forwardA) || (EX_MEM.RegisterRd == rt && !forwardB) )) ||
+		(MEM_WB.RegWrite && (MEM_WB.RegisterRd != 0) && ( (MEM_WB.RegisterRd == rs && !forwardA) || (MEM_WB.RegisterRd == rt && !forwardB) )))
 	{
 		// Stall the pipeline, hazard detected!
 		STALLING = TRUE;
