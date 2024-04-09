@@ -842,6 +842,12 @@ void ID()
 		IF_EX.imm = 0;
 	}
 
+	if(opcode == 0x63 || opcode == 0x6F)
+	{
+		printf("\nBRANCH DETECTED\n");
+		BRANCH_DETECTED = TRUE;
+	}
+
 	// Detect data hazards and stall the pipeline if necessary
 	if ((EX_MEM.RegWrite && (EX_MEM.RegisterRd != 0) && (EX_MEM.RegisterRd == rs || EX_MEM.RegisterRd == rt)) ||
 		(MEM_WB.RegWrite && (MEM_WB.RegisterRd != 0) && (MEM_WB.RegisterRd == rs || MEM_WB.RegisterRd == rt)))
@@ -878,7 +884,19 @@ void IF()
 	ID_IF.IR = mem_read_32(CURRENT_STATE.PC);
 	ID_IF.PC = CURRENT_STATE.PC;
 
-	if (!STALLING)
+	if(BRANCH_DETECTED)
+	{
+		ID_IF.IR = 00000000;
+		ID_IF.A = 0;
+		ID_IF.B = 0;
+		ID_IF.ALUOutput = 0;
+		ID_IF.LMD = 0;
+		ID_IF.RegWrite = FALSE;
+		ID_IF.RegisterRd = 0;
+
+		BRANCH_DETECTED = FALSE;
+	}
+	else if (!STALLING)
 	{
 		CURRENT_STATE.PC += 4;
 	}
