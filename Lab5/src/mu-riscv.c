@@ -70,6 +70,40 @@ void mem_write_32(uint32_t address, uint32_t value)
 	}
 }
 
+int32_t signExtend_13b(uint32_t number)
+{
+    // Appending leading zeroes to
+    // the 23-bit number
+    int32_t ans = number & 0x00001FFF;
+ 
+    // Checking if sign-bit of number is 0 or 1
+    if (number & 0x00001000) {
+ 
+        // If number is negative, append
+        // leading 1's to the 21-bit sequence
+        ans = ans | 0xFFFFE000;
+    }
+ 
+    return ans;
+}
+
+int32_t signExtend_21b(uint32_t number)
+{
+    // Appending leading zeroes to
+    // the 21-bit number
+    int32_t ans = number & 0x001FFFFF;
+ 
+    // Checking if sign-bit of number is 0 or 1
+    if (number & 0x00100000) {
+ 
+        // If number is negative, append
+        // leading 1's to the 21-bit sequence
+        ans = ans | 0xFFE00000;
+    }
+ 
+    return ans;
+}
+
 /***************************************************************/
 /* Execute one cycle                                                                                                              */
 /***************************************************************/
@@ -913,6 +947,10 @@ void initialize()
 // Returns 0 if not an all-zero instruction, 1 otherwise
 uint8_t print_instruction(const uint32_t instruction, const uint8_t printAddress, const uint32_t addr)
 {
+	const char branchHeader[] = "Br-";
+	int32_t offset; //offset for jumps
+	uint32_t branchAddress;
+
 	uint32_t opcode = instruction & 0x7F;
 	uint32_t rd = (instruction >> 7) & 0x1F;
 	uint32_t funct3 = (instruction >> 12) & 0x7;
@@ -1041,6 +1079,39 @@ uint8_t print_instruction(const uint32_t instruction, const uint8_t printAddress
 			break;
 		}
 		printf("x%d, %d(x%d)\n", rs2, imm, rs1);
+		break;
+
+	case 0x63: // B-type branching
+		imm += ((instruction & 0x80) >> 7) << 11; // imm[11]
+		imm += ((instruction & 0xF00) >> 8) << 1; // imm[4:1]
+		imm += ((instruction & 0x7E000000) >> 25) << 5; // imm[10:5]
+		imm += ((instruction & 0x80000000) >> 31) << 12;  // imm[12]
+
+		switch (funct3){
+			case 0x0: printf("beq "); break;
+			case 0x1: printf("bne "); break;
+			case 0x4: printf("blt "); break;
+			case 0x5: printf("bge "); break;
+			case 0x6: printf("bltu "); break;					
+			case 0x7: printf("bgeu "); break;
+		}
+
+		offset = signExtend_13b(imm);
+		branchAddress = addr + offset;
+
+		printf("x%d, x%d, %s%x\n", rs1, rs2, branchHeader, branchAddress);
+		break;
+
+	case 0x6F: // J-type instruction (only jal)
+		imm += ((instruction & 0xFF000) >> 12) << 12; //imm[19:12]
+		imm += ((instruction & 0x00100000) >> 20) << 11; //imm[11]
+		imm += ((instruction & 0x7FE00000) >> 21) << 1; //imm[10:1]
+		imm += ((instruction & 0x80000000) >> 31) << 20; //imm[20]
+
+		offset = signExtend_21b(imm);
+		branchAddress = addr + offset;
+
+		printf("jal x%d, %s%x\n", rd, branchHeader, branchAddress);
 		break;
 
 	default:
