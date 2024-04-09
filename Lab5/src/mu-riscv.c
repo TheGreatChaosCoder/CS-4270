@@ -672,6 +672,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x1: // BNE
 			if (IF_EX.A != IF_EX.B)
@@ -682,6 +683,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x4: // BLT
 			if ((int32_t)IF_EX.A < (int32_t)IF_EX.B)
@@ -692,6 +694,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x5: // BGE
 			if ((int32_t)IF_EX.A >= (int32_t)IF_EX.B)
@@ -702,6 +705,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x6: // BLTU
 			if (IF_EX.A < IF_EX.B)
@@ -712,6 +716,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x7: // BGEU
 			if (IF_EX.A >= IF_EX.B)
@@ -722,6 +727,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		}
 	}
@@ -729,11 +735,14 @@ void EX()
 	{ // U-type instructions
 		// LUI or AUIPC
 		EX_MEM.ALUOutput = IF_EX.imm;
+		CURRENT_STATE.PC = EX_MEM.ALUOutput;
+
 	}
 	else if (opcode == 0x6F)
 	{ // J-type instructions
 		// JAL
 		EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+		CURRENT_STATE.PC = EX_MEM.ALUOutput;
 	}
 }
 
@@ -820,7 +829,7 @@ inline uint8_t forwardingB(const uint32_t rt)
 void ID()
 {
 	// If the pipeline is currently stalled, do nothing
-	if (STALLING)
+	if (STALLING || BRANCH_DETECTED)
 	{
 		IF_EX.IR = 00000000;
 		IF_EX.A = 0;
@@ -829,6 +838,10 @@ void ID()
 		IF_EX.LMD = 0;
 		IF_EX.RegWrite = FALSE;
 		IF_EX.RegisterRd = 0;
+		if(BRANCH_DETECTED)
+		{
+			BRANCH_DETECTED = FALSE;
+		}
 		return;
 	}
 
@@ -876,6 +889,7 @@ void ID()
 		IF_EX.imm = 0;
 	}
 
+	// Check if instruction is of J-type or B-type
 	if(opcode == 0x63 || opcode == 0x6F)
 	{
 		printf("\nBRANCH DETECTED\n");
@@ -918,19 +932,8 @@ void IF()
 	ID_IF.IR = mem_read_32(CURRENT_STATE.PC);
 	ID_IF.PC = CURRENT_STATE.PC;
 
-	if(BRANCH_DETECTED)
-	{
-		ID_IF.IR = 00000000;
-		ID_IF.A = 0;
-		ID_IF.B = 0;
-		ID_IF.ALUOutput = 0;
-		ID_IF.LMD = 0;
-		ID_IF.RegWrite = FALSE;
-		ID_IF.RegisterRd = 0;
-
-		BRANCH_DETECTED = FALSE;
-	}
-	else if (!STALLING)
+	// 'Trail' with NOP if a branch was detected
+	if (!STALLING)
 	{
 		CURRENT_STATE.PC += 4;
 	}
