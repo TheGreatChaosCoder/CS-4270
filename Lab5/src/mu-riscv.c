@@ -452,6 +452,9 @@ void WB()
 	case 0x03: // Load-from-Memory Instruction (I-type Load)
 		CURRENT_STATE.REGS[rd] = MEM_WB.LMD;
 		break;
+	case 0x67: // I-Type Jump and Link Register (JALR)
+		CURRENT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+		break;
 	default: // NOP and Store Instruction (S-type)
 		// Do nothing
 		break;
@@ -741,8 +744,20 @@ void EX()
 	else if (opcode == 0x6F)
 	{ // J-type instructions
 		// JAL
-		EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
-		CURRENT_STATE.PC = EX_MEM.ALUOutput;
+		EX_MEM.RegWrite = TRUE;
+		EX_MEM.RegisterRd = (IF_EX.IR >> 7) & 0x1F;
+
+		CURRENT_STATE.PC = IF_EX.PC + IF_EX.imm;
+		EX_MEM.ALUOutput = IF_EX.PC + 4;
+	}
+	else if(opcode == 0x67)
+	{ // I-type jump
+		EX_MEM.RegWrite = TRUE;
+		EX_MEM.RegisterRd = (IF_EX.IR >> 7) & 0x1F;
+
+		// JALR
+		CURRENT_STATE.PC = IF_EX.A + IF_EX.imm;
+		EX_MEM.ALUOutput = IF_EX.PC + 4;
 	}
 }
 
