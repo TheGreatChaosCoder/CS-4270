@@ -70,6 +70,40 @@ void mem_write_32(uint32_t address, uint32_t value)
 	}
 }
 
+int32_t signExtend_13b(uint32_t number)
+{
+    // Appending leading zeroes to
+    // the 23-bit number
+    int32_t ans = number & 0x00001FFF;
+ 
+    // Checking if sign-bit of number is 0 or 1
+    if (number & 0x00001000) {
+ 
+        // If number is negative, append
+        // leading 1's to the 21-bit sequence
+        ans = ans | 0xFFFFE000;
+    }
+ 
+    return ans;
+}
+
+int32_t signExtend_21b(uint32_t number)
+{
+    // Appending leading zeroes to
+    // the 21-bit number
+    int32_t ans = number & 0x001FFFFF;
+ 
+    // Checking if sign-bit of number is 0 or 1
+    if (number & 0x00100000) {
+ 
+        // If number is negative, append
+        // leading 1's to the 21-bit sequence
+        ans = ans | 0xFFE00000;
+    }
+ 
+    return ans;
+}
+
 /***************************************************************/
 /* Execute one cycle                                                                                                              */
 /***************************************************************/
@@ -418,6 +452,9 @@ void WB()
 	case 0x03: // Load-from-Memory Instruction (I-type Load)
 		CURRENT_STATE.REGS[rd] = MEM_WB.LMD;
 		break;
+	case 0x67: // I-Type Jump and Link Register (JALR)
+		CURRENT_STATE.REGS[rd] = MEM_WB.ALUOutput;
+		break;
 	default: // NOP and Store Instruction (S-type)
 		// Do nothing
 		break;
@@ -638,6 +675,8 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x1: // BNE
 			if (IF_EX.A != IF_EX.B)
@@ -648,6 +687,8 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x4: // BLT
 			if ((int32_t)IF_EX.A < (int32_t)IF_EX.B)
@@ -658,6 +699,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x5: // BGE
 			if ((int32_t)IF_EX.A >= (int32_t)IF_EX.B)
@@ -668,6 +710,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x6: // BLTU
 			if (IF_EX.A < IF_EX.B)
@@ -678,6 +721,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		case 0x7: // BGEU
 			if (IF_EX.A >= IF_EX.B)
@@ -688,6 +732,7 @@ void EX()
 			{
 				EX_MEM.ALUOutput = IF_EX.PC + 4;
 			}
+			CURRENT_STATE.PC = EX_MEM.ALUOutput;
 			break;
 		}
 	}
@@ -695,11 +740,26 @@ void EX()
 	{ // U-type instructions
 		// LUI or AUIPC
 		EX_MEM.ALUOutput = IF_EX.imm;
+		CURRENT_STATE.PC = EX_MEM.ALUOutput;
+
 	}
 	else if (opcode == 0x6F)
 	{ // J-type instructions
 		// JAL
-		EX_MEM.ALUOutput = IF_EX.PC + IF_EX.imm;
+		EX_MEM.RegWrite = TRUE;
+		EX_MEM.RegisterRd = (IF_EX.IR >> 7) & 0x1F;
+
+		CURRENT_STATE.PC = IF_EX.PC + IF_EX.imm;
+		EX_MEM.ALUOutput = IF_EX.PC + 4;
+	}
+	else if(opcode == 0x67)
+	{ // I-type jump
+		EX_MEM.RegWrite = TRUE;
+		EX_MEM.RegisterRd = (IF_EX.IR >> 7) & 0x1F;
+
+		// JALR
+		CURRENT_STATE.PC = IF_EX.A + IF_EX.imm;
+		EX_MEM.ALUOutput = IF_EX.PC + 4;
 	}
 }
 
@@ -786,7 +846,7 @@ inline uint8_t forwardingB(const uint32_t rt)
 void ID()
 {
 	// If the pipeline is currently stalled, do nothing
-	if (STALLING)
+	if (STALLING || BRANCH_DETECTED)
 	{
 		IF_EX.IR = 00000000;
 		IF_EX.A = 0;
@@ -795,6 +855,10 @@ void ID()
 		IF_EX.LMD = 0;
 		IF_EX.RegWrite = FALSE;
 		IF_EX.RegisterRd = 0;
+		if(BRANCH_DETECTED)
+		{
+			BRANCH_DETECTED = FALSE;
+		}
 		return;
 	}
 
@@ -842,6 +906,12 @@ void ID()
 		IF_EX.imm = 0;
 	}
 
+	// Check if instruction is of J-type or B-type
+	if(opcode == 0x63 || opcode == 0x6F)
+	{
+		BRANCH_DETECTED = TRUE;
+	}
+
 	// Detect data hazards and stall the pipeline if necessary
 	if ((EX_MEM.RegWrite && (EX_MEM.RegisterRd != 0) && (EX_MEM.RegisterRd == rs || EX_MEM.RegisterRd == rt)) ||
 		(MEM_WB.RegWrite && (MEM_WB.RegisterRd != 0) && (MEM_WB.RegisterRd == rs || MEM_WB.RegisterRd == rt)))
@@ -878,6 +948,7 @@ void IF()
 	ID_IF.IR = mem_read_32(CURRENT_STATE.PC);
 	ID_IF.PC = CURRENT_STATE.PC;
 
+	// 'Trail' with NOP if a branch was detected
 	if (!STALLING)
 	{
 		CURRENT_STATE.PC += 4;
@@ -913,6 +984,10 @@ void initialize()
 // Returns 0 if not an all-zero instruction, 1 otherwise
 uint8_t print_instruction(const uint32_t instruction, const uint8_t printAddress, const uint32_t addr)
 {
+	const char branchHeader[] = "Br-";
+	int32_t offset; //offset for jumps
+	uint32_t branchAddress;
+
 	uint32_t opcode = instruction & 0x7F;
 	uint32_t rd = (instruction >> 7) & 0x1F;
 	uint32_t funct3 = (instruction >> 12) & 0x7;
@@ -1041,6 +1116,39 @@ uint8_t print_instruction(const uint32_t instruction, const uint8_t printAddress
 			break;
 		}
 		printf("x%d, %d(x%d)\n", rs2, imm, rs1);
+		break;
+
+	case 0x63: // B-type branching
+		imm += ((instruction & 0x80) >> 7) << 11; // imm[11]
+		imm += ((instruction & 0xF00) >> 8) << 1; // imm[4:1]
+		imm += ((instruction & 0x7E000000) >> 25) << 5; // imm[10:5]
+		imm += ((instruction & 0x80000000) >> 31) << 12;  // imm[12]
+
+		switch (funct3){
+			case 0x0: printf("beq "); break;
+			case 0x1: printf("bne "); break;
+			case 0x4: printf("blt "); break;
+			case 0x5: printf("bge "); break;
+			case 0x6: printf("bltu "); break;					
+			case 0x7: printf("bgeu "); break;
+		}
+
+		offset = signExtend_13b(imm);
+		branchAddress = addr + offset;
+
+		printf("x%d, x%d, %s%x\n", rs1, rs2, branchHeader, branchAddress);
+		break;
+
+	case 0x6F: // J-type instruction (only jal)
+		imm += ((instruction & 0xFF000) >> 12) << 12; //imm[19:12]
+		imm += ((instruction & 0x00100000) >> 20) << 11; //imm[11]
+		imm += ((instruction & 0x7FE00000) >> 21) << 1; //imm[10:1]
+		imm += ((instruction & 0x80000000) >> 31) << 20; //imm[20]
+
+		offset = signExtend_21b(imm);
+		branchAddress = addr + offset;
+
+		printf("jal x%d, %s%x\n", rd, branchHeader, branchAddress);
 		break;
 
 	default:

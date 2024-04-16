@@ -41,6 +41,7 @@ mem_region_t MEM_REGIONS[] = {
 int ENABLE_FORWARDING = FALSE;
 int STALLING = FALSE;
 int NO_FORWARD_DELAY = -1;
+int BRANCH_DETECTED = FALSE;
 
 typedef struct CPU_State_Struct
 {
