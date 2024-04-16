@@ -909,7 +909,6 @@ void ID()
 	// Check if instruction is of J-type or B-type
 	if(opcode == 0x63 || opcode == 0x6F)
 	{
-		printf("\nBRANCH DETECTED\n");
 		BRANCH_DETECTED = TRUE;
 	}
 
