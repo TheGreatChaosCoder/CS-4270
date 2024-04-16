@@ -23,6 +23,7 @@ void help()
 	printf("low <val>\t-- set the LO register to <val>\n");
 	printf("print\t-- print the program loaded into memory\n");
 	printf("show\t-- print the current content of the pipeline registers\n");
+	printf("forward\t-- enable / disable forwarding\n");
 	printf("?\t-- display help menu\n");
 	printf("quit\t-- exit the simulator\n\n");
 	printf("------------------------------------------------------------------\n\n");
